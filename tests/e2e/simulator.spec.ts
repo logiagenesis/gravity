@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 /**
  * Open a panel tab. The simulator now presents its controls in an overlay
@@ -235,5 +236,25 @@ test.describe("simulator", () => {
     await expect(
       page.getByRole("list", { name: "Warnings about this simulation" }),
     ).toHaveCount(0);
+  });
+
+  test("saves the view as a PNG captioned with its citation", async ({ page }) => {
+    // An image of a simulation shared without saying where its data came from
+    // is exactly the unsourced claim this project exists not to make, so the
+    // citation is composited into the file rather than left to the sharer.
+    await openTab(page, "Share");
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Save image" }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toBe("sun-and-earth.png");
+
+    const path = await file.path();
+    const bytes = await readFile(path);
+    // A real PNG, not an empty or truncated one. The WebGL context has no
+    // preserveDrawingBuffer, so a naive capture would produce a blank image.
+    expect(bytes.subarray(0, 8)).toEqual(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+    expect(bytes.byteLength).toBeGreaterThan(5000);
   });
 });

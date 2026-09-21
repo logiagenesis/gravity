@@ -643,6 +643,60 @@ export class GravityScene {
     this.frameHandle = requestAnimationFrame(this.renderFrame);
   };
 
+  /**
+   * Render one frame and return it as a PNG data URL, with an optional
+   * caption strip carrying the scenario's name and its citation.
+   *
+   * The WebGL context is created WITHOUT `preserveDrawingBuffer`, because
+   * keeping the back buffer around costs memory and bandwidth on every frame
+   * for a feature used once in a while. The consequence is that reading the
+   * canvas after the browser has composited returns an empty image, so this
+   * renders synchronously and reads the pixels in the SAME task — which is
+   * the supported way to do it, and why this lives here rather than in the
+   * component.
+   *
+   * The caption is composited onto a 2D canvas rather than drawn into the 3D
+   * scene, so the picture itself is never altered by the act of exporting it.
+   */
+  capturePng(caption?: { title: string; citation?: string }): string {
+    this.renderer.render(this.scene, this.camera);
+    const source = this.renderer.domElement;
+
+    if (caption === undefined) return source.toDataURL("image/png");
+
+    const scale = source.width / Math.max(1, source.clientWidth || source.width);
+    const pad = Math.round(16 * scale);
+    const titleSize = Math.round(18 * scale);
+    const citationSize = Math.round(12 * scale);
+    const lines = caption.citation === undefined ? 1 : 2;
+    const stripHeight =
+      pad * 2 + titleSize + (lines > 1 ? citationSize + Math.round(6 * scale) : 0);
+
+    const out = document.createElement("canvas");
+    out.width = source.width;
+    out.height = source.height + stripHeight;
+    const context = out.getContext("2d");
+    if (context === null) return source.toDataURL("image/png");
+
+    context.drawImage(source, 0, 0);
+    context.fillStyle = "#03050b";
+    context.fillRect(0, source.height, out.width, stripHeight);
+    context.fillStyle = "#e9eef5";
+    context.font = `600 ${titleSize}px system-ui, sans-serif`;
+    context.textBaseline = "top";
+    context.fillText(caption.title, pad, source.height + pad);
+    if (caption.citation !== undefined) {
+      context.fillStyle = "#9babbd";
+      context.font = `${citationSize}px system-ui, sans-serif`;
+      context.fillText(
+        caption.citation,
+        pad,
+        source.height + pad + titleSize + Math.round(6 * scale),
+      );
+    }
+    return out.toDataURL("image/png");
+  }
+
   start(): void {
     if (this.frameHandle === null) {
       this.frameHandle = requestAnimationFrame(this.renderFrame);

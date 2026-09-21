@@ -317,6 +317,35 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     if (Number.isFinite(value) && value >= 0) clientRef.current?.setSoftening(value);
   };
 
+  /**
+   * Save the current view as a PNG, captioned with the scenario's name and
+   * the source its numbers came from.
+   *
+   * The citation travels with the picture deliberately: an image of a
+   * simulation shared without saying where its data came from is exactly the
+   * kind of unsourced claim this project exists not to make.
+   */
+  const handleExportImage = () => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const citation = [scenario.source.provider, scenario.source.reference]
+      .filter((part) => part.trim() !== "")
+      .join(" — ");
+    let url: string;
+    try {
+      url = scene.capturePng({ title: scenario.name, citation });
+    } catch {
+      setSaveState("The image could not be captured in this browser.");
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${scenario.id}.png`;
+    link.click();
+    setSaveState("Image saved.");
+    setAnnounce("Image saved.");
+  };
+
   const handleCollisionMode = (mode: CollisionMode) => {
     setCollisionMode(mode);
     clientRef.current?.setCollisionMode(mode);
@@ -926,6 +955,9 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         </button>
         <button type="button" className="btn" onClick={() => void handleShare()}>
           Share link
+        </button>
+        <button type="button" className="btn" onClick={handleExportImage}>
+          Save image
         </button>
       </div>
       {saveState && <p className="field-hint">{saveState}</p>}
