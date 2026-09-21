@@ -1,4 +1,13 @@
 {
-  "files": [],
-  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "types": ["node", "vite/client"], "noEmit": true },
+  "include": [
+    "src",
+    "scripts",
+    "tests",
+    "data",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
 }
