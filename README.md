@@ -40,6 +40,18 @@ Per-frame body state never enters React. Physics never runs on the main thread.
 
 First e2e run needs a browser: `npm run e2e:install`.
 
+## Test suites
+
+| Suite            | Count | Covers                                                                                                                                              |
+| ---------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/physics/` | 30    | Two-body orbits, figure-eight choreography, Barnes-Hut vs direct force, collisions, timestep independence, deterministic replay                     |
+| `tests/schema/`  | 50    | Schema validation, migrations, and **physical** correctness of the shipped data (Earth's year, the lunar month, Jupiter's period, trojan stability) |
+| `tests/worker/`  | 18    | Worker protocol: command serialisation, message routing, zero-copy buffer transfer, disposal                                                        |
+| `tests/share/`   | 9     | Share-link round-trip, compression, fragment-only payload, rejection of malformed input                                                             |
+| `tests/e2e/`     | 33    | Browser flows, axe accessibility scans, keyboard-only operation, mobile viewport, performance baseline                                              |
+
+**107 unit tests + 33 browser tests.**
+
 ## Repository layout
 
 ```
