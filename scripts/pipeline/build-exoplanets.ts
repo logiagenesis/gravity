@@ -21,6 +21,7 @@ import { format } from "prettier";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { elementsToStateVectors, orbitalPeriodDays } from "../../src/sim/kepler";
+import { G_AU3_PER_MSUN_DAY2 } from "../../src/sim/constants";
 import { safeParseScenario, CURRENT_SCHEMA_VERSION } from "../../src/schema/scenario";
 // One definition of the slug, shared with the catalogue build so it can
 // reconstruct ids from names instead of storing all 4,432 of them.
@@ -51,7 +52,13 @@ const ACKNOWLEDGEMENT =
 interface Row {
   planet: string;
   host: string;
+  /** Published semi-major axis, AU. Often derived by the archive, not measured. */
   a: number | null;
+  /** Published orbital period, days. The directly measured quantity. */
+  period: number | null;
+  /** Semi-major axis actually used, AU, and where it came from. */
+  aUsed: number;
+  aFromPeriod: boolean;
   e: number | null;
   massEarth: number | null;
   radiusEarth: number | null;
@@ -155,6 +162,15 @@ function describeStar(teff: number | null, mass: number): string {
   return `${spectralClass(teff).phrase} of ${mass.toFixed(2)} solar masses`;
 }
 
+/**
+ * Semi-major axis from an orbital period, by Kepler's third law:
+ * a = (mu (P / 2pi)^2)^(1/3), with mu = G(M* + Mp) in AU^3 / (Msun day^2).
+ */
+function semiMajorAxisFromPeriod(periodDays: number, totalMassSolar: number): number {
+  const mu = G_AU3_PER_MSUN_DAY2 * totalMassSolar;
+  return Math.cbrt(mu * Math.pow(periodDays / (2 * Math.PI), 2));
+}
+
 interface Excluded {
   host: string;
   reason: string;
@@ -173,8 +189,9 @@ async function main(): Promise<void> {
   const iSm = idx("st_mass");
   const iSr = idx("st_rad");
   const iSt = idx("st_teff");
+  const iP = idx("pl_orbper");
 
-  if ([iPl, iHost, iA, iM, iSm].some((i) => i < 0)) {
+  if ([iPl, iHost, iA, iP, iM, iSm].some((i) => i < 0)) {
     console.error("Snapshot is missing required columns.");
     process.exit(1);
   }
@@ -185,6 +202,9 @@ async function main(): Promise<void> {
       planet: r[iPl],
       host: r[iHost],
       a: num(r[iA]),
+      period: num(r[iP]),
+      aUsed: 0,
+      aFromPeriod: false,
       e: iE >= 0 ? num(r[iE]) : null,
       massEarth: num(r[iM]),
       radiusEarth: iR >= 0 ? num(r[iR]) : null,
@@ -204,6 +224,11 @@ async function main(): Promise<void> {
   let written = 0;
   let planetsIncluded = 0;
   const byPlanetCount = new Map<number, number>();
+  /** Where each included planet's orbit size came from, for the report. */
+  let orbitsFromPeriod = 0;
+  let orbitsFromAxis = 0;
+  /** How far the published axis would have disagreed with the published period. */
+  const axisDisagreement: number[] = [];
 
   for (const [host, planets] of bySystem) {
     const starMass = planets[0].starMass;
@@ -212,16 +237,57 @@ async function main(): Promise<void> {
       continue;
     }
 
+    /*
+     * SEMI-MAJOR AXIS FROM THE PUBLISHED PERIOD, where there is one.
+     *
+     * pscomppars is a COMPOSITE table: it takes each parameter from whichever
+     * reference the archive judges best, so `pl_orbsmax` and `pl_orbper` can
+     * come from different papers — or from the same paper and still disagree.
+     * Measured across the whole snapshot, the period implied by `pl_orbsmax`
+     * differs from the published `pl_orbper` by more than 10% for 402 of
+     * 5,570 planets and by more than a factor of two for 26 (see
+     * artifacts/09-exoplanet-pipeline-report.md). Spot checks show why:
+     * KOI-2513.01 carries a semi-major axis of exactly 0.5 AU against a
+     * period of 19.005 days, and TOI-2285 b pairs a 2022 axis with a 2025
+     * period.
+     *
+     * For a transiting or radial-velocity detection the PERIOD is what is
+     * measured; the axis is inferred from it and the stellar mass. Deriving
+     * the axis back from the period and the mass we are actually going to
+     * integrate with therefore uses the better quantity AND makes each
+     * scenario self-consistent: the orbit it simulates has the period the
+     * archive publishes. Where no period is published the axis is used as
+     * given, and the scenario says so.
+     */
+    for (const row of planets) {
+      const massSolar =
+        row.massEarth !== null && row.massEarth > 0
+          ? row.massEarth * EARTH_MASS_IN_SOLAR
+          : 0;
+      if (row.period !== null && row.period > 0) {
+        row.aUsed = semiMajorAxisFromPeriod(row.period, starMass + massSolar);
+        row.aFromPeriod = true;
+      } else if (row.a !== null && row.a > 0) {
+        row.aUsed = row.a;
+        row.aFromPeriod = false;
+      } else {
+        row.aUsed = 0;
+      }
+    }
+
     // Keep only planets with the minimum usable set.
     const usable = planets.filter(
-      (p) => p.a !== null && p.a > 0 && p.massEarth !== null && p.massEarth > 0,
+      (p) => p.aUsed > 0 && p.massEarth !== null && p.massEarth > 0,
     );
     if (usable.length === 0) {
-      excluded.push({ host, reason: "no planet with both semi-major axis and mass" });
+      excluded.push({
+        host,
+        reason: "no planet with a usable orbit (period or semi-major axis) and a mass",
+      });
       continue;
     }
 
-    usable.sort((x, y) => (x.a as number) - (y.a as number));
+    usable.sort((x, y) => x.aUsed - y.aUsed);
 
     const starRadiusAu =
       planets[0].starRadius !== null && planets[0].starRadius > 0
@@ -250,7 +316,7 @@ async function main(): Promise<void> {
 
     usable.forEach((p, index) => {
       if (failed) return;
-      const a = p.a as number;
+      const a = p.aUsed;
       const massSolar = (p.massEarth as number) * EARTH_MASS_IN_SOLAR;
       // Eccentricity is frequently blank; the archive convention is that a
       // blank means "not measured", not "zero". A circular orbit is the
@@ -332,12 +398,19 @@ async function main(): Promise<void> {
     }
 
     // Timestep must resolve the innermost orbit: 1/400 of its period.
-    const innermost = usable[0].a as number;
+    const innermost = usable[0].aUsed;
     const shortestPeriod = orbitalPeriodDays(innermost, starMass);
     const dt = Math.max(1e-6, Number((shortestPeriod / 400).toPrecision(3)));
 
     const n = usable.length;
     byPlanetCount.set(n, (byPlanetCount.get(n) ?? 0) + 1);
+    for (const u of usable) {
+      if (u.aFromPeriod) orbitsFromPeriod++;
+      else orbitsFromAxis++;
+      if (u.aFromPeriod && u.a !== null && u.a > 0) {
+        axisDisagreement.push(Math.abs(u.aUsed - u.a) / u.a);
+      }
+    }
 
     const assumptions: string[] = [];
     if (starRadiusAssumed) {
@@ -356,6 +429,21 @@ async function main(): Promise<void> {
         `${blankE} eccentricity value(s) not published; circular orbits assumed`,
       );
     }
+    const fromAxis = usable.filter((p) => !p.aFromPeriod).length;
+    if (fromAxis === usable.length) {
+      assumptions.push(
+        "orbit sizes taken from the published semi-major axis; no orbital period is published for this system",
+      );
+    } else if (fromAxis > 0) {
+      assumptions.push(
+        `${usable.length - fromAxis} orbit size(s) derived from the published orbital period; ` +
+          `${fromAxis} taken from the published semi-major axis where no period is published`,
+      );
+    } else {
+      assumptions.push(
+        "orbit sizes derived from the published orbital period and the stellar mass, so each orbit has the period the archive publishes",
+      );
+    }
     assumptions.push(
       "starting mean anomalies are distributed evenly and are NOT the real orbital phases; this is not an ephemeris",
     );
@@ -363,8 +451,8 @@ async function main(): Promise<void> {
     const planetWord = n === 1 ? "planet" : "planets";
     const summary =
       `${host} is ${describeStar(planets[0].starTeff, starMass)}, with ${n} known ${planetWord} ` +
-      `between ${(usable[0].a as number).toPrecision(3)} and ` +
-      `${(usable[n - 1].a as number).toPrecision(3)} AU. ` +
+      `between ${usable[0].aUsed.toPrecision(3)} and ` +
+      `${usable[n - 1].aUsed.toPrecision(3)} AU. ` +
       `Simulated as an n-body system from published orbital elements.`;
 
     const doc = {
@@ -443,6 +531,29 @@ async function main(): Promise<void> {
     `| **Systems written** | **${written}** |`,
     `| Planets included | ${planetsIncluded} |`,
     `| Systems excluded | ${excluded.length} |`,
+    `| Orbits sized from the published PERIOD | ${orbitsFromPeriod} |`,
+    `| Orbits sized from the published semi-major AXIS | ${orbitsFromAxis} |`,
+    "",
+    "## Why orbits are sized from the period",
+    "",
+    "`pscomppars` is a COMPOSITE table: each parameter is taken from whichever",
+    "reference the archive judges best, so `pl_orbsmax` and `pl_orbper` may come",
+    "from different papers, or from the same paper and still disagree. For a",
+    "transiting or radial-velocity detection the period is the measured quantity",
+    "and the axis is inferred from it, so this pipeline derives the axis back",
+    "from the period and the stellar mass it actually integrates with. Each",
+    "scenario therefore reproduces the period the archive publishes, which",
+    "`tests/catalog/generated-scenarios.test.ts` checks on every CI run.",
+    "",
+    "How far the published axis would have disagreed, over the",
+    `${axisDisagreement.length} planets that have both:`,
+    "",
+    "| Disagreement in semi-major axis | Planets |",
+    "|---|---|",
+    ...[0.01, 0.05, 0.1, 0.25].map(
+      (t) =>
+        `| over ${(t * 100).toFixed(0)}% | ${axisDisagreement.filter((d) => d > t).length} |`,
+    ),
     "",
     "## Systems by planet count",
     "",

@@ -254,8 +254,8 @@ committed. This section is maintained as sources are added.
 | **Date checked**             | 21/09/2026                                                                                                                                                                                                                              |
 | **Required acknowledgement** | "This research has made use of the NASA Exoplanet Archive, which is operated by the California Institute of Technology, under contract with the National Aeronautics and Space Administration under the Exoplanet Exploration Program." |
 | **Requested citation**       | Christiansen et al. (2025), the archive's overview paper                                                                                                                                                                                |
-| **What we ingest**           | Numerical parameters only: planet and host names, semi-major axis, eccentricity, planet mass and radius, stellar mass/radius/effective temperature, planet count. **No prose, no images.**                                              |
-| **Rows available**           | 5,905 planets with the minimum usable set (a, M★, Mp) as of the retrieval date                                                                                                                                                          |
+| **What we ingest**           | Numerical parameters only: planet and host names, orbital period, semi-major axis, eccentricity, planet mass and radius, stellar mass/radius/effective temperature. **No prose, no images.**                                            |
+| **Rows available**           | 6,322 planets with a usable orbit (published period **or** semi-major axis) plus M★ and Mp, as of the retrieval date. Verified against the archive's own count query                                                                    |
 | **Verdict**                  | ✅ **Usable.** Facts are not copyrightable, the archive explicitly invites reuse, and the acknowledgement is discharged per scenario in the mandatory `source` block plus a site-wide credit                                            |
 
 **How the acknowledgement is discharged.** Every generated scenario carries the
@@ -268,7 +268,21 @@ never see. The site-wide credit additionally appears on the About page.
 The pipeline therefore reads a **committed CSV snapshot** rather than querying
 at build time — which is also what makes builds reproducible and offline-safe.
 The snapshot records the exact ADQL query and retrieval date so it can be
-regenerated and audited.
+regenerated and audited: see `data/sources/snapshots/README.md`.
+
+**Data-quality note, found by our own checks.** `pscomppars` is a _composite_
+table — each parameter is taken from whichever reference the archive judges
+best — so `pl_orbsmax` and `pl_orbper` can come from different papers, or from
+the same paper and still disagree. Measured over the 5,570 planets that carry
+both, the period implied by the published semi-major axis differs from the
+published period by more than 10% for 210 of them and by more than 25% for 43.
+Spot checks show why: `KOI-2513.01` carries a semi-major axis of exactly
+0.5 AU against a period of 19.005 days, and `TOI-2285 b` pairs a 2022 axis with
+a 2025 period. Because the period is the measured quantity for transit and
+radial-velocity detections, the pipeline sizes every orbit from it and falls
+back to the axis only where no period is published (335 of 6,322 planets).
+This is recorded in each affected scenario's own citation block and checked in
+CI.
 
 ### NASA JPL Solar System Dynamics / NSSDCA Planetary Fact Sheet
 
