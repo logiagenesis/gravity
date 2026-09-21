@@ -31,7 +31,8 @@ export interface BodyPatch {
 }
 
 export type ScenarioEdit =
-  | { kind: "add"; body: BodyInit }
+  /** `index` restores a body to where it was; without it the body is appended. */
+  | { kind: "add"; body: BodyInit; index?: number }
   /**
    * Add a body on a circular orbit about another, sized in the worker.
    *
@@ -47,6 +48,34 @@ export type ScenarioEdit =
       radiusAu: number;
     }
   | { kind: "update"; id: string; patch: BodyPatch }
+  /**
+   * Change a body RELATIVE to what it is now: twice the mass, half the
+   * distance, a thousandth more speed.
+   *
+   * These cannot be expressed as an `update`, which carries absolute numbers,
+   * without first reading the body — and between that read and the write the
+   * simulation has moved on, so a position-relative change resolved on the
+   * main thread would be computed against a state that no longer exists. The
+   * worker resolves it against the state it is about to write to, and reports
+   * the resolved absolute `update` so redo replays that and not a fresh
+   * fraction of wherever the body has drifted to since.
+   */
+  | {
+      kind: "scale";
+      id: string;
+      /**
+       * Separation and speed are measured from this body when given, and from
+       * the origin otherwise. "Half the Moon's distance" means half its
+       * distance FROM THE EARTH, not from the origin of the frame.
+       */
+      relativeTo?: string;
+      /** Factor on the mass. */
+      mass?: number;
+      /** Factor on the separation from `relativeTo`. */
+      separation?: number;
+      /** Factor on the velocity relative to `relativeTo`. */
+      speed?: number;
+    }
   | { kind: "remove"; id: string };
 
 /**
@@ -176,7 +205,8 @@ export function applyEdit(state: SimState, edit: ScenarioEdit, g: number): EditR
     case "add": {
       validateBody(edit.body);
       requireUniqueId(state, edit.body.id);
-      state.addBody(edit.body);
+      if (edit.index === undefined) state.addBody(edit.body);
+      else state.insertBody(edit.body, edit.index);
       return { inverse: { kind: "remove", id: edit.body.id }, applied: edit };
     }
 
@@ -202,8 +232,64 @@ export function applyEdit(state: SimState, edit: ScenarioEdit, g: number): EditR
         );
       }
       const previous = readBody(state, i);
-      state.removeBody(i);
-      return { inverse: { kind: "add", body: previous }, applied: edit };
+      // Order-preserving, and the index travels in the inverse: an edit has an
+      // undo, and undo has to give back the list the person was looking at,
+      // not the same bodies in a new arrangement.
+      state.removeBodyPreservingOrder(i);
+      return { inverse: { kind: "add", body: previous, index: i }, applied: edit };
+    }
+
+    case "scale": {
+      const i = indexOfId(state, edit.id);
+      const body = readBody(state, i);
+      const origin =
+        edit.relativeTo === undefined
+          ? {
+              position: { x: 0, y: 0, z: 0 },
+              velocity: { x: 0, y: 0, z: 0 },
+            }
+          : readBody(state, indexOfId(state, edit.relativeTo));
+
+      for (const [label, factor] of [
+        ["mass", edit.mass],
+        ["separation", edit.separation],
+        ["speed", edit.speed],
+      ] as const) {
+        if (factor !== undefined && !Number.isFinite(factor)) {
+          throw new EditError(`The ${label} factor must be a finite number.`);
+        }
+      }
+
+      const scaleAbout = (
+        value: { x: number; y: number; z: number },
+        about: { x: number; y: number; z: number },
+        factor: number,
+      ) => ({
+        x: about.x + (value.x - about.x) * factor,
+        y: about.y + (value.y - about.y) * factor,
+        z: about.z + (value.z - about.z) * factor,
+      });
+
+      // Resolved to absolute numbers, then applied through the ordinary
+      // update path so it faces exactly the same validation.
+      const resolved: ScenarioEdit = {
+        kind: "update",
+        id: edit.id,
+        patch: {
+          ...(edit.mass === undefined ? {} : { mass: body.mass * edit.mass }),
+          ...(edit.separation === undefined
+            ? {}
+            : {
+                position: scaleAbout(body.position, origin.position, edit.separation),
+              }),
+          ...(edit.speed === undefined
+            ? {}
+            : {
+                velocity: scaleAbout(body.velocity, origin.velocity, edit.speed),
+              }),
+        },
+      };
+      return applyEdit(state, resolved, g);
     }
 
     case "update": {

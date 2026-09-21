@@ -25,6 +25,8 @@ import { COLLISION_MODE_INFO, type CollisionMode } from "../sim/collisions";
 import { simulationWarnings } from "../sim/warnings";
 import { DriftChart, type DriftSample } from "./components/DriftChart";
 import { BodyEditor } from "./components/BodyEditor";
+import { Experiments } from "./components/Experiments";
+import { experimentsFor } from "../experiments/catalogue";
 import {
   EMPTY_HISTORY,
   canRedo,
@@ -187,11 +189,20 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const initialFocus = useMemo(() => {
     const target = scenario.camera?.target;
     if (target === undefined) return null;
-    const index = scenario.bodies.findIndex((body) => body.id === target);
-    return index >= 0 ? index : null;
+    return scenario.bodies.some((body) => body.id === target) ? target : null;
   }, [scenario]);
 
-  const [focusIndex, setFocusIndex] = useState<number | null>(initialFocus);
+  /*
+   * Focus is held as a body ID, not an index.
+   *
+   * The renderer works in indices, because it reads a positions buffer, and
+   * for a fixed body set an index was the same thing. Editing broke that:
+   * removing a body shifts every later index down, so "follow body 4" quietly
+   * became "follow whatever is in slot 4 now", or nothing at all when the set
+   * shrank past it. An ID survives any edit, and the index is derived from the
+   * live body list on the way to the renderer.
+   */
+  const [focusId, setFocusId] = useState<string | null>(initialFocus);
   const [showLabels, setShowLabels] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [showBarycentre, setShowBarycentre] = useState(false);
@@ -324,13 +335,19 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     sceneRef.current?.setScaleMode(scaleMode);
   }, [scaleMode]);
 
+  const focusIndex = useMemo(() => {
+    if (focusId === null) return null;
+    const index = bodies.findIndex((body) => body.id === focusId);
+    return index >= 0 ? index : null;
+  }, [bodies, focusId]);
+
   useEffect(() => {
     sceneRef.current?.setFocus(focusIndex);
   }, [focusIndex]);
 
   // A new scenario brings its own framing and its own contact mode with it.
   useEffect(() => {
-    setFocusIndex(initialFocus);
+    setFocusId(initialFocus);
   }, [initialFocus]);
 
   useEffect(() => {
@@ -529,7 +546,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         setShowLabels((v) => !v);
       } else if (event.key === "c") {
         sceneRef.current?.recentreCamera();
-        setFocusIndex(null);
+        setFocusId(null);
         setAnnounce("Camera recentred.");
       } else if (event.key === "+" || event.key === "=") {
         sceneRef.current?.zoomCamera(0.85);
@@ -636,6 +653,8 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   );
   const positions = positionsRef.current;
 
+  const experiments = useMemo(() => experimentsFor(scenario.id), [scenario.id]);
+
   /*
    * Show the z column only when something is actually out of the plane.
    *
@@ -687,17 +706,17 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         </thead>
         <tbody>
           {bodies.map((body, index) => (
-            <tr key={body.id} data-focused={focusIndex === index ? "true" : undefined}>
+            <tr key={body.id} data-focused={focusId === body.id ? "true" : undefined}>
               <th scope="row">
                 <button
                   type="button"
                   className="body-focus"
-                  aria-pressed={focusIndex === index}
+                  aria-pressed={focusId === body.id}
                   onClick={() => {
-                    const next = focusIndex === index ? null : index;
-                    setFocusIndex(next);
+                    const following = focusId === body.id;
+                    setFocusId(following ? null : body.id);
                     setAnnounce(
-                      next === null
+                      following
                         ? "Camera no longer following a body."
                         : `Camera following ${body.name}.`,
                     );
@@ -1071,7 +1090,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
             className="btn"
             onClick={() => {
               sceneRef.current?.recentreCamera();
-              setFocusIndex(null);
+              setFocusId(null);
               setAnnounce("Camera recentred.");
             }}
           >
@@ -1116,10 +1135,23 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
 
   const editorPanel = (
     <>
+      {/*
+       * Guided experiments lead, the manual editor follows. A learner who
+       * opens this tab should find something to try, not an empty form; the
+       * editor's own framing travels with the editor rather than standing at
+       * the top as a second introduction to the same thing.
+       */}
+      <Experiments
+        experiments={experiments}
+        applyEdit={handleEdit}
+        onPlay={togglePlay}
+        playing={playing}
+      />
+      {experiments.length > 0 && <h3>Or change it yourself</h3>}
       <p className="source-note">
-        Change the system and watch what happens. Edits apply to the running simulation
-        rather than restarting it, so you can remove a planet mid-orbit and see the rest
-        respond. Reset restores the published scenario.
+        Edits apply to the running simulation rather than restarting it, so you can
+        remove a planet mid-orbit and see the rest respond. Reset restores the published
+        scenario.
       </p>
       <BodyEditor
         bodies={bodies}
@@ -1282,7 +1314,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               { id: "bodies", label: "Bodies", content: bodiesPanel },
               { id: "diagnostics", label: "Diagnostics", content: diagnosticsPanel },
               { id: "settings", label: "View", content: settingsPanel },
-              { id: "edit", label: "Edit", content: editorPanel },
+              { id: "edit", label: "Experiment", content: editorPanel },
               { id: "source", label: "Source", content: sourcePanel },
               { id: "share", label: "Share", content: sharePanel },
             ]}

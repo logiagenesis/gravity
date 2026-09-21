@@ -62,14 +62,14 @@ const SHOTS: Shot[] = [
     name: "m5-desktop-editor",
     path: "#/scenario/inner-solar-system",
     viewport: DESKTOP,
-    prepare: (page) => openTab(page, "Edit"),
+    prepare: (page) => openTab(page, "Experiment"),
   },
   {
     name: "m5-desktop-editor-add",
     path: "#/scenario/inner-solar-system",
     viewport: DESKTOP,
     prepare: async (page) => {
-      await openTab(page, "Edit");
+      await openTab(page, "Experiment");
       await page.getByRole("button", { name: "Add a body" }).click();
       await page.waitForTimeout(200);
     },
@@ -79,7 +79,7 @@ const SHOTS: Shot[] = [
     path: "#/scenario/inner-solar-system",
     viewport: DESKTOP,
     prepare: async (page) => {
-      await openTab(page, "Edit");
+      await openTab(page, "Experiment");
       await page.getByRole("button", { name: "Edit Earth" }).click();
       await page.getByLabel("Radius (AU)").fill("0");
       await page.getByRole("button", { name: "Save" }).click();
@@ -87,10 +87,32 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "m5-desktop-experiments",
+    path: "#/scenario/jupiter-trojan-points",
+    viewport: DESKTOP,
+    prepare: (page) => openTab(page, "Experiment"),
+  },
+  {
+    name: "m5-desktop-experiment-answer",
+    path: "#/scenario/earth-and-moon",
+    viewport: DESKTOP,
+    prepare: async (page) => {
+      await openTab(page, "Experiment");
+      await page.getByText("What happens, and why").first().click();
+      await page.waitForTimeout(200);
+    },
+  },
+  {
+    name: "m5-mobile-experiments",
+    path: "#/scenario/jupiter-trojan-points",
+    viewport: MOBILE,
+    prepare: (page) => openTab(page, "Experiment"),
+  },
+  {
     name: "m5-mobile-editor",
     path: "#/scenario/inner-solar-system",
     viewport: MOBILE,
-    prepare: (page) => openTab(page, "Edit"),
+    prepare: (page) => openTab(page, "Experiment"),
   },
 ];
 

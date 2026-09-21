@@ -407,3 +407,157 @@ describe("addOrbiting", () => {
     expect(state.count).toBe(2);
   });
 });
+
+describe("scale", () => {
+  /** Earth at x = 1 moving at 0.017, about a Sun at the origin. */
+  const system = () => start();
+
+  it("doubles a mass and leaves everything else exactly alone", () => {
+    const state = system();
+    const before = snapshot(state);
+    applyEdit(state, { kind: "scale", id: "earth", mass: 2 });
+    expect(state.masses[1]).toBe(before.masses[1] * 2);
+    expect([...state.positions.slice(0, 6)]).toEqual(before.positions);
+    expect([...state.velocities.slice(0, 6)]).toEqual(before.velocities);
+  });
+
+  it("halves the separation FROM THE PARENT, not from the origin", () => {
+    // The distinction that makes this edit worth having: in a frame where the
+    // parent is not at the origin, scaling about the origin would move the
+    // body somewhere with no physical meaning.
+    const state = system();
+    state.positions[0] = 10; // Sun at x = 10
+    state.positions[3] = 11; // Earth at x = 11, so 1 AU out
+    applyEdit(state, {
+      kind: "scale",
+      id: "earth",
+      relativeTo: "sun",
+      separation: 0.5,
+    });
+    expect(state.positions[3]).toBeCloseTo(10.5, 12);
+  });
+
+  it("scales speed relative to the parent, so a shared drift is kept", () => {
+    const state = system();
+    state.velocities[1] = 0.003; // the Sun drifts
+    state.velocities[4] = 0.02; // the Earth: 0.017 relative to it
+    applyEdit(state, {
+      kind: "scale",
+      id: "earth",
+      relativeTo: "sun",
+      speed: 2,
+    });
+    // 0.003 + 2 * (0.02 - 0.003)
+    expect(state.velocities[4]).toBeCloseTo(0.037, 12);
+  });
+
+  it("is exactly invertible, like every other edit", () => {
+    const state = system();
+    const before = snapshot(state);
+    const inverse = applyEdit(state, {
+      kind: "scale",
+      id: "earth",
+      relativeTo: "sun",
+      mass: 3,
+      separation: 0.5,
+      speed: 1.4142135623730951,
+    });
+    expect(snapshot(state)).not.toEqual(before);
+    applyEdit(state, inverse);
+    expect(snapshot(state)).toEqual(before);
+  });
+
+  it("resolves to an absolute update, so redo does not compound", () => {
+    // Applying "half the distance" twice would quarter it. Redo must replay
+    // the resolved absolute position instead.
+    const state = system();
+    const first = applyEditWithG(
+      state,
+      { kind: "scale", id: "earth", relativeTo: "sun", separation: 0.5 },
+      G_AU3_PER_MSUN_DAY2,
+    );
+    expect(first.applied.kind).toBe("update");
+    const afterScale = state.positions[3];
+
+    applyEdit(state, first.inverse);
+    applyEdit(state, first.applied);
+    expect(state.positions[3]).toBe(afterScale);
+  });
+
+  it("refuses a factor that is not a finite number", () => {
+    const state = system();
+    expect(() =>
+      applyEdit(state, { kind: "scale", id: "earth", mass: Number.NaN }),
+    ).toThrow(/finite number/);
+    // And a factor that would produce an invalid body is caught by the same
+    // validation an ordinary update faces.
+    expect(() => applyEdit(state, { kind: "scale", id: "earth", mass: -1 })).toThrow(
+      /negative/,
+    );
+  });
+
+  it("refuses an unknown body, and an unknown parent", () => {
+    const state = system();
+    expect(() => applyEdit(state, { kind: "scale", id: "pluto", mass: 2 })).toThrow(
+      /No body with id/,
+    );
+    expect(() =>
+      applyEdit(state, {
+        kind: "scale",
+        id: "earth",
+        relativeTo: "pluto",
+        separation: 2,
+      }),
+    ).toThrow(/No body with id/);
+  });
+});
+
+describe("order", () => {
+  /** Five bodies, so there is a genuine middle to remove from. */
+  const five = () =>
+    SimState.fromBodies(
+      ["a", "b", "c", "d", "e"].map((id, i) =>
+        body({ id, name: id.toUpperCase(), position: { x: i, y: 0, z: 0 } }),
+      ),
+    );
+
+  it("removing from the middle does not reshuffle the rest", () => {
+    // The engine's collision path swaps the last body into the hole, which is
+    // right there and wrong here: an edit has an undo, and a list that
+    // rearranges itself under the person is not an undo.
+    const state = five();
+    applyEdit(state, { kind: "remove", id: "c" });
+    expect(state.ids.slice(0, state.count)).toEqual(["a", "b", "d", "e"]);
+  });
+
+  it("undoing a removal puts the body back where it was", () => {
+    const state = five();
+    const inverse = applyEdit(state, { kind: "remove", id: "b" });
+    applyEdit(state, inverse);
+    expect(state.ids.slice(0, state.count)).toEqual(["a", "b", "c", "d", "e"]);
+    expect([...state.positions.slice(0, 15)]).toEqual([
+      0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 4, 0, 0,
+    ]);
+  });
+
+  it("restores the first and the last correctly too", () => {
+    for (const id of ["a", "e"]) {
+      const state = five();
+      const before = snapshot(state);
+      applyEdit(state, applyEdit(state, { kind: "remove", id }));
+      expect(snapshot(state)).toEqual(before);
+    }
+  });
+
+  it("a plain add still appends", () => {
+    const state = five();
+    applyEdit(state, { kind: "add", body: body({ id: "f", name: "F" }) });
+    expect(state.ids.slice(0, state.count)).toEqual(["a", "b", "c", "d", "e", "f"]);
+  });
+
+  it("an index beyond the end appends rather than throwing", () => {
+    const state = five();
+    applyEdit(state, { kind: "add", body: body({ id: "f", name: "F" }), index: 99 });
+    expect(state.ids[state.count - 1]).toBe("f");
+  });
+});

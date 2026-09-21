@@ -179,6 +179,101 @@ export class SimState {
     this.count = last;
   }
 
+  /**
+   * Add a body at a specific position in the order.
+   *
+   * This exists so that undoing a removal is exact. Appending the body back
+   * restores the physics but not the arrangement: delete Venus from the middle
+   * of the inner solar system, press undo, and it reappears after Mars. The
+   * index travels in the inverse edit, so undo puts it back where it was.
+   */
+  insertBody(body: BodyInit, index: number): void {
+    this.addBody(body);
+    const last = this.count - 1;
+    const target = Math.max(0, Math.min(index, last));
+    if (target === last) return;
+
+    const k = last * 3;
+    const position = [this.positions[k], this.positions[k + 1], this.positions[k + 2]];
+    const velocity = [
+      this.velocities[k],
+      this.velocities[k + 1],
+      this.velocities[k + 2],
+    ];
+    const acceleration = [
+      this.accelerations[k],
+      this.accelerations[k + 1],
+      this.accelerations[k + 2],
+    ];
+    const mass = this.masses[last];
+    const radius = this.radii[last];
+    const flag = this.flags[last];
+    const id = this.ids[last];
+    const name = this.names[last];
+    const colour = this.colours[last];
+
+    for (let j = last; j > target; j--) {
+      const a = j * 3;
+      const b = (j - 1) * 3;
+      for (let c = 0; c < 3; c++) {
+        this.positions[a + c] = this.positions[b + c];
+        this.velocities[a + c] = this.velocities[b + c];
+        this.accelerations[a + c] = this.accelerations[b + c];
+      }
+      this.masses[j] = this.masses[j - 1];
+      this.radii[j] = this.radii[j - 1];
+      this.flags[j] = this.flags[j - 1];
+      this.ids[j] = this.ids[j - 1];
+      this.names[j] = this.names[j - 1];
+      this.colours[j] = this.colours[j - 1];
+    }
+
+    const t = target * 3;
+    for (let c = 0; c < 3; c++) {
+      this.positions[t + c] = position[c];
+      this.velocities[t + c] = velocity[c];
+      this.accelerations[t + c] = acceleration[c];
+    }
+    this.masses[target] = mass;
+    this.radii[target] = radius;
+    this.flags[target] = flag;
+    this.ids[target] = id;
+    this.names[target] = name;
+    this.colours[target] = colour;
+  }
+
+  /**
+   * Remove a body, keeping the order of the rest.
+   *
+   * `removeBody` swaps the last body into the hole, which is O(1) and right
+   * for collisions: merges happen inside the step loop, possibly many per
+   * frame, and nothing about the physics depends on the order.
+   *
+   * An EDIT is different. It is a user action with an undo, and undo has to
+   * restore what the person was looking at. With the swap, deleting Mars and
+   * undoing gave back the same physics in a different order, so the body list
+   * and table reshuffled under them for no reason they could see. Editing is
+   * rare and this is one pass over the arrays, so the cost is nothing.
+   */
+  removeBodyPreservingOrder(i: number): void {
+    for (let j = i; j < this.count - 1; j++) {
+      const a = j * 3;
+      const b = (j + 1) * 3;
+      for (let c = 0; c < 3; c++) {
+        this.positions[a + c] = this.positions[b + c];
+        this.velocities[a + c] = this.velocities[b + c];
+        this.accelerations[a + c] = this.accelerations[b + c];
+      }
+      this.masses[j] = this.masses[j + 1];
+      this.radii[j] = this.radii[j + 1];
+      this.flags[j] = this.flags[j + 1];
+      this.ids[j] = this.ids[j + 1];
+      this.names[j] = this.names[j + 1];
+      this.colours[j] = this.colours[j + 1];
+    }
+    this.count -= 1;
+  }
+
   /** Deep copy. Used by tests and by deterministic-replay checks. */
   clone(): SimState {
     const copy = new SimState(this.capacity);

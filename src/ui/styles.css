@@ -1396,3 +1396,106 @@ kbd {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
+
+/* -------------------------------------------------------------------------
+   Guided experiments
+
+   Cards inside the details panel. The question is the heaviest text on each
+   one because it is what the learner is meant to engage with; the answer is
+   behind a disclosure so it cannot be read by accident.
+   ------------------------------------------------------------------------- */
+.experiments h3,
+.body-editor + h3,
+.experiments + h3 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+.experiments__list {
+  list-style: none;
+  margin: var(--s-3) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.experiment {
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.experiment h4 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--accent-strong);
+}
+
+.experiment__question {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+.experiments__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+.experiment__answer {
+  margin-top: var(--s-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--s-2);
+}
+
+.experiment__answer summary {
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+}
+
+.experiment__answer summary:hover {
+  color: var(--text);
+}
+
+/*
+ * A disclosure triangle, drawn by hand.
+ *
+ * `display: flex` on the summary suppresses the browser's own marker, and
+ * without one the line read as ordinary prose — in the milestone screenshot
+ * "What happens, and why" looked like a caption rather than something to
+ * press. The global prefers-reduced-motion rule already neutralises the
+ * rotation for anyone who asks for that.
+ */
+.experiment__answer summary::-webkit-details-marker {
+  display: none;
+}
+.experiment__answer summary::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  margin-right: var(--s-2);
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+.experiment__answer[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.experiment__answer p {
+  margin: var(--s-2) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}

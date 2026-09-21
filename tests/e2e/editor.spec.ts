@@ -12,7 +12,7 @@ import { openTab } from "./helpers";
 test.beforeEach(async ({ page }) => {
   await page.goto("/#/scenario/inner-solar-system");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await openTab(page, "Edit");
+  await openTab(page, "Experiment");
 });
 
 test.describe("the body editor", () => {
