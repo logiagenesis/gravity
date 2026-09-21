@@ -9,3 +9,7 @@ test-results
 .env
 .env.*
 src/catalog/generated
+# Generated from data/sources/snapshots/ by scripts/pipeline/build-exoplanets.ts
+# in ~1.6s on every build. 4,432 files / 18 MB of derived data does not belong
+# in git; the 552 kB snapshot it is derived from does.
+data/scenarios/exoplanets
