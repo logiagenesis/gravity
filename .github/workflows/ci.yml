@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Dependency licence gate
+        run: npm run licences
+
+      - name: Unit and physics regression tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify sitemap and robots were generated
+        run: |
+          test -f dist/sitemap.xml || { echo "::error::dist/sitemap.xml missing"; exit 1; }
+          test -f dist/robots.txt || { echo "::error::dist/robots.txt missing"; exit 1; }
+          grep -q "sitemap.xml" dist/robots.txt || { echo "::error::robots.txt does not reference the sitemap"; exit 1; }
+          echo "sitemap.xml and robots.txt present and consistent"
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end and accessibility tests
+        run: npm run e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: npm audit (production dependencies)
+        run: npm audit --omit=dev --audit-level=high

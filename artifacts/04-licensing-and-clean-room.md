@@ -13,13 +13,13 @@ project ever wants to depend on them. Nothing here is legal advice.
 Repository: `TheHappyKoala/harmony-of-the-spheres` @
 `ffbd3ebde342170515bb581b2637ffde87e7f1d0`, cloned and inspected 21/09/2026.
 
-| Check | Command | Result |
-|---|---|---|
-| Licence file present? | `find . -iname "LICENSE*" -o -iname "COPYING*"` | **none — empty output** |
-| Licence declared in metadata? | `grep -n license package.json` | `:11` → `"license": "GNU General Public License v3.0"` |
-| Valid SPDX identifier? | compared against SPDX list | **No.** Valid forms are `GPL-3.0-only` / `GPL-3.0-or-later` |
-| Copyright asserted anywhere? | live v2 footer | "Copyright © Darrell Arjuna Huffman 2024" |
-| Per-file licence headers? | inspected `src/physics/**`, `src/scene/**` | none seen |
+| Check                         | Command                                         | Result                                                      |
+| ----------------------------- | ----------------------------------------------- | ----------------------------------------------------------- |
+| Licence file present?         | `find . -iname "LICENSE*" -o -iname "COPYING*"` | **none — empty output**                                     |
+| Licence declared in metadata? | `grep -n license package.json`                  | `:11` → `"license": "GNU General Public License v3.0"`      |
+| Valid SPDX identifier?        | compared against SPDX list                      | **No.** Valid forms are `GPL-3.0-only` / `GPL-3.0-or-later` |
+| Copyright asserted anywhere?  | live v2 footer                                  | "Copyright © Darrell Arjuna Huffman 2024"                   |
+| Per-file licence headers?     | inspected `src/physics/**`, `src/scene/**`      | none seen                                                   |
 
 **So: the project claims GPLv3 in package metadata, carries no licence text,
 uses a non-standard identifier, and asserts reserved copyright on the live
@@ -36,10 +36,10 @@ Three points matter, and the third is the one people get wrong:
    Treating that as accidental would be wilful blindness.
 
 2. **GPLv3 expects its own text to travel with the work.** The licence is
-   granted *by* its text; distributing under it without shipping it leaves the
+   granted _by_ its text; distributing under it without shipping it leaves the
    actual grant ill-defined.
 
-3. **A missing licence file makes reuse *riskier*, not safer.** Under the Berne
+3. **A missing licence file makes reuse _riskier_, not safer.** Under the Berne
    Convention, copyright subsists automatically on creation. No licence file
    means **no grant of permission** — the default is exclusive copyright, i.e.
    all rights reserved. "There's no LICENSE so it must be free" is exactly
@@ -82,8 +82,8 @@ required is to keep it that way.
 
 **Clean-room implementation. No upstream material of any kind.**
 
-Per the brief: *"If licensing intent is not explicitly known, default to
-clean-room."* Intent is not explicitly known (blocking question **B1** in
+Per the brief: _"If licensing intent is not explicitly known, default to
+clean-room."_ Intent is not explicitly known (blocking question **B1** in
 `01-questions-and-answers.md` is unanswered). Clean-room is the default and it
 is also the cheapest option. Decision taken; no further input needed to proceed.
 
@@ -106,9 +106,9 @@ is also the cheapest option. Decision taken; no further input needed to proceed.
   physics and published algorithms — not anyone's copyrighted expression.
   Implemented from method, with the source cited in the code.
 - ✅ **Facts.** Masses, radii, orbital elements, state vectors. Facts are not
-  copyrightable (*Feist v. Rural*, US; similar principles elsewhere). Taken
+  copyrightable (_Feist v. Rural_, US; similar principles elsewhere). Taken
   from primary sources, not from upstream's files.
-- ✅ **Interoperability knowledge gained by auditing.** Knowing *that* a
+- ✅ **Interoperability knowledge gained by auditing.** Knowing _that_ a
   refresh-rate-coupled timestep is wrong is knowledge, not expression.
 - ✅ **Independently-licensed third-party libraries**, each recorded in §7.
 - ✅ **Generic UX conventions** — a play button is a play button.
@@ -120,6 +120,7 @@ creates a real contamination risk, and I am naming it rather than pretending it
 away.
 
 **Mitigation, applied in practice:**
+
 - The audit records **defects and their consequences**, never implementation
   recipes to copy.
 - Our physics is written from **standard published formulations** — the papers
@@ -145,14 +146,15 @@ gravity share — which is not protectable expression.
 Facts are not copyrightable, but **compilations** can attract database rights
 (notably in the EU/UK), and providers attach their own terms. So:
 
-| Source | Role | Terms position |
-|---|---|---|
-| **JPL Horizons** (NASA/Caltech) | State vectors, ephemerides | US-government-funded public data; NASA generally permits reuse of unrestricted material with attribution. **Confidence: Medium** — verify per dataset at ingest |
-| **NASA Exoplanet Archive** (IPAC/Caltech) | Exoplanet parameters | Publicly accessible; requests specific acknowledgement. **Confidence: Medium** — verify at ingest |
-| **NASA planetary fact sheets** | Masses, radii, rotation | Public NASA factual data. **Confidence: Medium** |
-| **Published papers** | Choreography initial conditions | Numerical values are facts; **the paper's text is not**. Cite the DOI, never quote the prose |
+| Source                                    | Role                            | Terms position                                                                                                                                                  |
+| ----------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **JPL Horizons** (NASA/Caltech)           | State vectors, ephemerides      | US-government-funded public data; NASA generally permits reuse of unrestricted material with attribution. **Confidence: Medium** — verify per dataset at ingest |
+| **NASA Exoplanet Archive** (IPAC/Caltech) | Exoplanet parameters            | Publicly accessible; requests specific acknowledgement. **Confidence: Medium** — verify at ingest                                                               |
+| **NASA planetary fact sheets**            | Masses, radii, rotation         | Public NASA factual data. **Confidence: Medium**                                                                                                                |
+| **Published papers**                      | Choreography initial conditions | Numerical values are facts; **the paper's text is not**. Cite the DOI, never quote the prose                                                                    |
 
 **Standing rules for the data pipeline:**
+
 1. Every scenario carries a **mandatory, machine-readable `source`** — provider,
    identifier, retrieval date, URL.
 2. **Only numerical values and object designations** are ingested. Never
@@ -176,16 +178,16 @@ by the back door the exact constraint this document avoids.
 
 Verified at time of selection:
 
-| Dependency | Licence | Role |
-|---|---|---|
-| React, React-DOM | MIT | UI chrome |
-| TypeScript | Apache-2.0 | Build |
-| Vite | MIT | Build/dev |
-| Three.js | MIT | Rendering |
-| Zod | MIT | Runtime schema validation |
-| Vitest | MIT | Unit/physics tests |
-| Playwright | Apache-2.0 | E2E + accessibility |
-| axe-core | **MPL-2.0** | Accessibility testing — **dev-only, not bundled.** MPL is file-level copyleft; keeping it out of the runtime avoids the question entirely |
+| Dependency       | Licence     | Role                                                                                                                                      |
+| ---------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| React, React-DOM | MIT         | UI chrome                                                                                                                                 |
+| TypeScript       | Apache-2.0  | Build                                                                                                                                     |
+| Vite             | MIT         | Build/dev                                                                                                                                 |
+| Three.js         | MIT         | Rendering                                                                                                                                 |
+| Zod              | MIT         | Runtime schema validation                                                                                                                 |
+| Vitest           | MIT         | Unit/physics tests                                                                                                                        |
+| Playwright       | Apache-2.0  | E2E + accessibility                                                                                                                       |
+| axe-core         | **MPL-2.0** | Accessibility testing — **dev-only, not bundled.** MPL is file-level copyleft; keeping it out of the runtime avoids the question entirely |
 
 Enforcement: `npm run verify` includes a licence check that **fails the build**
 on any GPL/AGPL/SSPL/CC-BY-SA in the production dependency tree.
@@ -212,7 +214,7 @@ Blocking question **B1** (proprietary vs open) is unanswered. Therefore:
 
 ---
 
-## 9. Attribution we *do* owe
+## 9. Attribution we _do_ owe
 
 Clean-room does not mean pretending the prior art did not exist. The rebuild's
 credits will acknowledge Harmony of the Spheres by Darrell Huffman and
@@ -223,12 +225,12 @@ there is none.
 
 ## 10. Ongoing verification
 
-| Control | Mechanism | When |
-|---|---|---|
-| No upstream code enters the repo | Upstream clone lives at `/home/user/thehappykoala/…`, **outside** the project tree; never copied in | Continuous |
-| Dependency licences stay permissive | `npm run verify` licence gate; build fails on copyleft | Every CI run |
-| No secrets committed | Secret scan in CI | Every CI run |
-| Data terms re-checked | Recorded per scenario at ingest | Every ingest |
+| Control                             | Mechanism                                                                                           | When         |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- | ------------ |
+| No upstream code enters the repo    | Upstream clone lives at `/home/user/thehappykoala/…`, **outside** the project tree; never copied in | Continuous   |
+| Dependency licences stay permissive | `npm run verify` licence gate; build fails on copyleft                                              | Every CI run |
+| No secrets committed                | Secret scan in CI                                                                                   | Every CI run |
+| Data terms re-checked               | Recorded per scenario at ingest                                                                     | Every ingest |
 
 **Verified now:** the upstream clone is at
 `/home/user/thehappykoala/harmony-of-the-spheres`, entirely outside

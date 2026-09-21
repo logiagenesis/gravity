@@ -1,6 +1,7 @@
 # 03 — Audit of gravitysimulator.org and Harmony-of-the-Spheres
 
 **Subjects**
+
 - Live site: `https://gravitysimulator.org` (v1, apex) and
   `https://gravitysimulator.org/version-2/` (v2). Fetched **21/09/2026**.
 - Source: `TheHappyKoala/harmony-of-the-spheres` @
@@ -21,30 +22,30 @@ inherited code to audit and no GPL history to unwind.
 
 ## 1. Summary of findings by severity
 
-| # | Severity | Finding | Evidence |
-|---|---|---|---|
-| F1 | **Critical** | Barnes-Hut silently drops every body beyond a hardcoded ±500 box, returning **exactly zero** force. Default code path | §4.1, probe |
-| F2 | **Critical** | Collision merge destroys linear momentum — measured **200 → 0** | §4.2, probe |
-| F3 | **Critical** | Simulation speed is proportional to **monitor refresh rate** | §4.3 |
-| F4 | **High** | Entire Redux state deep-cloned **and** all body state dispatched back, **every frame** | §5.1 |
-| F5 | **High** | Physics runs on the main thread; no Web Worker anywhere | §5.2 |
-| F6 | **High** | Zero tests, zero CI | §8 |
-| F7 | **High** | Build **rewrites its own `node_modules`** on every run | §7.2 |
-| F8 | **High** | Dead Universal Analytics tag still loading on every page | §9.2 |
-| F9 | **High** | AdSense in the `<head>` of simulation pages — contradicting the project README | §9.1 |
-| F10 | **High** | v2 blocks pinch-zoom (`maximum-scale=1.0`) — WCAG 2.2 SC 1.4.4 failure | §10.1 |
-| F11 | **High** | Interactive controls are `<div>`/`<li>`, not buttons; no keyboard access, no accessible names | §10.2 |
-| F12 | **Medium** | `robots.txt` advertises a sitemap that returns **404** | §11.1 |
-| F13 | **Medium** | v2 `og:url` contains a **doubled** `/version-2/version-2/` path | §11.2 |
-| F14 | **Medium** | v1 `og:image` URLs contain **unencoded spaces** and use a different host | §11.3 |
-| F15 | **Medium** | No `X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy`; CSP has only `frame-ancestors` | §12.1 |
-| F16 | **Medium** | No `LICENSE` file despite a GPLv3 claim in `package.json` | §13 |
-| F17 | **Medium** | No runtime validation of imported/saved scenarios | §12.3 |
-| F18 | **Medium** | Barnes-Hut root centre of mass seeded with a spurious `(−500,−500,−500)` | §4.4 |
-| F19 | **Medium** | Unbounded octree recursion — no depth guard | §4.5 |
-| F20 | **Low** | Two live product versions (Gatsby 2 and Gatsby 5) competing on one domain | §3 |
-| F21 | **Low** | `gatsby-plugin-sitemap` and `gatsby-plugin-google-gtag` are dependencies but not registered plugins | §7.3 |
-| F22 | **Low** | Collision loop splices while iterating without correcting indices | §4.2 |
+| #   | Severity     | Finding                                                                                                               | Evidence    |
+| --- | ------------ | --------------------------------------------------------------------------------------------------------------------- | ----------- |
+| F1  | **Critical** | Barnes-Hut silently drops every body beyond a hardcoded ±500 box, returning **exactly zero** force. Default code path | §4.1, probe |
+| F2  | **Critical** | Collision merge destroys linear momentum — measured **200 → 0**                                                       | §4.2, probe |
+| F3  | **Critical** | Simulation speed is proportional to **monitor refresh rate**                                                          | §4.3        |
+| F4  | **High**     | Entire Redux state deep-cloned **and** all body state dispatched back, **every frame**                                | §5.1        |
+| F5  | **High**     | Physics runs on the main thread; no Web Worker anywhere                                                               | §5.2        |
+| F6  | **High**     | Zero tests, zero CI                                                                                                   | §8          |
+| F7  | **High**     | Build **rewrites its own `node_modules`** on every run                                                                | §7.2        |
+| F8  | **High**     | Dead Universal Analytics tag still loading on every page                                                              | §9.2        |
+| F9  | **High**     | AdSense in the `<head>` of simulation pages — contradicting the project README                                        | §9.1        |
+| F10 | **High**     | v2 blocks pinch-zoom (`maximum-scale=1.0`) — WCAG 2.2 SC 1.4.4 failure                                                | §10.1       |
+| F11 | **High**     | Interactive controls are `<div>`/`<li>`, not buttons; no keyboard access, no accessible names                         | §10.2       |
+| F12 | **Medium**   | `robots.txt` advertises a sitemap that returns **404**                                                                | §11.1       |
+| F13 | **Medium**   | v2 `og:url` contains a **doubled** `/version-2/version-2/` path                                                       | §11.2       |
+| F14 | **Medium**   | v1 `og:image` URLs contain **unencoded spaces** and use a different host                                              | §11.3       |
+| F15 | **Medium**   | No `X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy`; CSP has only `frame-ancestors`                | §12.1       |
+| F16 | **Medium**   | No `LICENSE` file despite a GPLv3 claim in `package.json`                                                             | §13         |
+| F17 | **Medium**   | No runtime validation of imported/saved scenarios                                                                     | §12.3       |
+| F18 | **Medium**   | Barnes-Hut root centre of mass seeded with a spurious `(−500,−500,−500)`                                              | §4.4        |
+| F19 | **Medium**   | Unbounded octree recursion — no depth guard                                                                           | §4.5        |
+| F20 | **Low**      | Two live product versions (Gatsby 2 and Gatsby 5) competing on one domain                                             | §3          |
+| F21 | **Low**      | `gatsby-plugin-sitemap` and `gatsby-plugin-google-gtag` are dependencies but not registered plugins                   | §7.3        |
+| F22 | **Low**      | Collision loop splices while iterating without correcting indices                                                     | §4.2        |
 
 ---
 
@@ -64,6 +65,7 @@ grep -rni "kinetic|angularMomentum|totalEnergy" src → (no matches)
 grep -rn "depth|MAX_DEPTH" src/physics             → (no matches)
 ./node_modules/.bin/tsx probe.ts                   → see §4.1, §4.2
 ```
+
 Live-site fetches: homepage, `/robots.txt`, `/sitemap-index.xml`,
 `/solar-system/the-solar-system`, `/version-2/scenarios/all/`, and a
 `securityheaders.com` scan. All 21/09/2026.
@@ -72,14 +74,14 @@ Live-site fetches: homepage, `/robots.txt`, `/sitemap-index.xml`,
 
 ## 3. Product structure and version fragmentation (F20)
 
-| | v1 | v2 |
-|---|---|---|
-| URL | `https://gravitysimulator.org/` | `https://gravitysimulator.org/version-2/` |
-| `<meta name="generator">` | **Gatsby 2.32.13** | **Gatsby 5.12.4** |
-| Built from repo HEAD? | **No** | Yes |
-| "All scenarios" pagination | 107 pages | 248 pages |
-| Ads present | **Yes** | Not observed on the catalogue page |
-| Blocks pinch-zoom | No | **Yes** |
+|                            | v1                              | v2                                        |
+| -------------------------- | ------------------------------- | ----------------------------------------- |
+| URL                        | `https://gravitysimulator.org/` | `https://gravitysimulator.org/version-2/` |
+| `<meta name="generator">`  | **Gatsby 2.32.13**              | **Gatsby 5.12.4**                         |
+| Built from repo HEAD?      | **No**                          | Yes                                       |
+| "All scenarios" pagination | 107 pages                       | 248 pages                                 |
+| Ads present                | **Yes**                         | Not observed on the catalogue page        |
+| Blocks pinch-zoom          | No                              | **Yes**                                   |
 
 `gatsby-config.ts:4` sets `pathPrefix: "/version-2"`, so the repo builds v2
 only. v1's source is not at HEAD. Two overlapping, separately indexable copies
@@ -131,8 +133,8 @@ silently loses gravity on its outer bodies.
 `src/physics/collisions/collisions-check.ts:40` is the entire merge:
 
 ```ts
-survivor.m = massI.m + massJ.m;   // :40
-masses.splice(looserIndex, 1);    // :42
+survivor.m = massI.m + massJ.m; // :40
+masses.splice(looserIndex, 1); // :42
 ```
 
 Mass is summed. The survivor's **velocity is never updated**, its **position is
@@ -162,6 +164,7 @@ element it refers to may have been removed. `looserIndex--` (`:48`) is dead code
 ### 4.3 F3 — Simulation speed tracks monitor refresh rate (Critical)
 
 `src/scene/scenes/planetary-scene.ts`:
+
 - `:342` `const delta = this.clock.getDelta();`
 - `:386` `this.integrator.iterate();` — called **once per frame**, inside
   `if (this.scenario.playing)`
@@ -200,7 +203,7 @@ from a shipped scenario (I did not attempt to trigger it).
 For fairness — the force law itself is right. `euler.ts:123` computes
 `G·m_j / (r² + ε²)^{3/2}`, the standard **Plummer-softened** acceleration.
 `euler.ts:113` correctly skips zero-mass sources in the direct path. The
-integrator *coefficients* were not audited; the defects above are all in the
+integrator _coefficients_ were not audited; the defects above are all in the
 surrounding infrastructure.
 
 ### 4.7 No correctness diagnostics exist
@@ -245,7 +248,7 @@ directly stalls input handling and rendering.
 ### 5.3 Data layout
 
 Array-of-objects throughout. `Vector.toObject()` allocates a fresh `{x,y,z}`
-literal per body per sub-step; `new Vector()` is allocated *inside*
+literal per body per sub-step; `new Vector()` is allocated _inside_
 `BHAccelerate`, `generateChildren`, `insertMassInTree` and `fixCoM` — i.e.
 inside the hot recursion. Sustained GC pressure at frame rate, and no
 possibility of zero-copy transfer to a worker.
@@ -281,6 +284,7 @@ non-generated source file. Adaptive quality was **not** assessed; marked
 ## 7. Build process
 
 ### 7.1 Stack
+
 Gatsby 5.12.4, React 18, Redux 4 + redux-thunk, Three 0.169, LESS, TypeScript
 5.1. `package.json` scripts: `develop`, `start`, `build`, `serve`, `clean`,
 `typecheck`, `format`. **No lint script. No test script.**
@@ -328,8 +332,8 @@ survive to production.
 
 ### 9.1 F9 — AdSense on simulation pages, contradicting the README (High)
 
-`README.md` states: *"ads are displayed on the scenario menu pages, but not on
-the scenario pages where you run the simulations themselves."*
+`README.md` states: _"ads are displayed on the scenario menu pages, but not on
+the scenario pages where you run the simulations themselves."_
 
 The `<head>` of `https://gravitysimulator.org/solar-system/the-solar-system`
 — a scenario/simulation page — contains:
@@ -392,7 +396,12 @@ From the rendered simulation page:
 ```html
 <div class="button play-pause"><i class="fas fa-play"></i></div>
 <div class="button reset"><i class="fas fa-refresh"></i></div>
-<ul class="nav"><li class="nav-item active"><span><i class="fas fa-paint-brush"></i>Graphics</span></li>…
+<ul class="nav">
+  <li class="nav-item active">
+    <span><i class="fas fa-paint-brush"></i>Graphics</span>
+  </li>
+  …
+</ul>
 ```
 
 - Controls are `<div>` — not `<button>`. No `role`, no `tabindex`. **Not
@@ -416,12 +425,14 @@ A keyboard-only or screen-reader user cannot start, stop or reset a simulation.
 ### 11.1 F12 — Advertised sitemap 404s
 
 `https://gravitysimulator.org/robots.txt`:
+
 ```
 User-agent: *
 Allow: /
 Sitemap: https://gravitysimulator.org/sitemap-index.xml
 Host: https://gravitysimulator.org
 ```
+
 `https://gravitysimulator.org/sitemap-index.xml` → **HTTP 404** (Netlify "Page
 not found"). Crawlers are directed to a dead sitemap. **Confidence: High.**
 
@@ -452,6 +463,7 @@ category is questionable, and there is no `BreadcrumbList` and no
 judgement.
 
 ### 11.5 Canonicals
+
 v1's `<link rel="canonical">` on the scenario page is correct and matches the
 URL. Credit where due.
 
@@ -464,14 +476,14 @@ URL. Credit where due.
 Verified via securityheaders.com, 21/09/2026 (grade **B**; `server: Netlify`;
 IP 35.157.26.135):
 
-| Header | Value | Verdict |
-|---|---|---|
-| `content-security-policy` | `frame-ancestors 'none'` | present, but **no `default-src`/`script-src`** → no XSS mitigation |
-| `strict-transport-security` | `max-age=31536000` | present, **no `includeSubDomains`, no `preload`** |
-| `x-frame-options` | `DENY` | present |
-| `x-content-type-options` | — | **missing** |
-| `referrer-policy` | — | **missing** |
-| `permissions-policy` | — | **missing** |
+| Header                      | Value                    | Verdict                                                            |
+| --------------------------- | ------------------------ | ------------------------------------------------------------------ |
+| `content-security-policy`   | `frame-ancestors 'none'` | present, but **no `default-src`/`script-src`** → no XSS mitigation |
+| `strict-transport-security` | `max-age=31536000`       | present, **no `includeSubDomains`, no `preload`**                  |
+| `x-frame-options`           | `DENY`                   | present                                                            |
+| `x-content-type-options`    | —                        | **missing**                                                        |
+| `referrer-policy`           | —                        | **missing**                                                        |
+| `permissions-policy`        | —                        | **missing**                                                        |
 
 **Confidence: High.**
 
@@ -489,6 +501,7 @@ unchecked. **Confidence: High** for the absence. Whether this is exploitable was
 **not tested** — I did not attempt an exploit and am not going to.
 
 ### 12.4 Secrets
+
 No committed secrets found in the files inspected. Not an exhaustive
 history scan. **Confidence: Medium.**
 
@@ -506,7 +519,7 @@ history scan. **Confidence: Medium.**
 GPLv3 requires the full licence text to accompany the work. A missing licence
 file does **not** make code freely reusable — the default is exclusive
 copyright, while the `package.json` string signals copyleft intent. The net
-effect is that reuse is *more* legally ambiguous, not less.
+effect is that reuse is _more_ legally ambiguous, not less.
 
 Full analysis and decision: `04-licensing-and-clean-room.md`.
 **Confidence: High.**
@@ -521,6 +534,7 @@ on the live site. Any figure here would be invented, and the brief forbids that.
 
 What is established is **architectural**, from source, and independent of
 measurement:
+
 - physics on the main thread (F5),
 - a full state serialise+parse and a full body-state dispatch every frame (F4),
 - per-step object allocation in the hot path (§5.3),
@@ -555,13 +569,13 @@ numerical ambition while fixing the architecture around it.
 
 ## 16. Explicit unknowns
 
-| Unknown | What would resolve it |
-|---|---|
-| Live traffic, audience, geography | Owner grants analytics/log access |
-| Revenue from AdSense | Owner provides AdSense reporting |
-| Whether a `/privacy` page exists | Full route crawl of both versions |
-| Whether each of the 4,435 scenarios carries a citation field | Schema scan of all files |
-| v1's source at its deployed commit | Owner identifies the v1 branch/tag |
-| Adaptive quality in the renderer | Profile a live session |
-| Real-device frame timings | Instrumented runs on named hardware |
+| Unknown                                                                | What would resolve it                       |
+| ---------------------------------------------------------------------- | ------------------------------------------- |
+| Live traffic, audience, geography                                      | Owner grants analytics/log access           |
+| Revenue from AdSense                                                   | Owner provides AdSense reporting            |
+| Whether a `/privacy` page exists                                       | Full route crawl of both versions           |
+| Whether each of the 4,435 scenarios carries a citation field           | Schema scan of all files                    |
+| v1's source at its deployed commit                                     | Owner identifies the v1 branch/tag          |
+| Adaptive quality in the renderer                                       | Profile a live session                      |
+| Real-device frame timings                                              | Instrumented runs on named hardware         |
 | Whether F19 (unbounded recursion) is reachable from a shipped scenario | Fuzz the octree with near-coincident bodies |

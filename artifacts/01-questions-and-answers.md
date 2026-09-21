@@ -8,6 +8,7 @@ carries a **confidence** and a **source**. Where I could not verify, the answer
 says **UNKNOWN** and states exactly what would resolve it.
 
 Confidence scale:
+
 - **High** — read directly from source code, live HTTP response, or normative spec.
 - **Medium** — inferred from strong indirect evidence, stated as inference.
 - **Low** — plausible but unverified; treated as a hypothesis, not a fact.
@@ -58,7 +59,7 @@ present in the `<head>` of the **simulation** page
 behaviour disagree. **Confidence: High.**
 
 **Q8. What should the rebuild's product goal be?**
-Fastest, most trustworthy, most accessible way to *see* and *interrogate*
+Fastest, most trustworthy, most accessible way to _see_ and _interrogate_
 gravitational dynamics — with the physics correct and the correctness
 **visible** (conservation diagnostics on screen). That is the defensible
 differentiator; see `05-product-and-technical-spec.md`. **Confidence: Medium**
@@ -187,7 +188,7 @@ referenced exactly once more in the entire file — line 632, a star shader's
 **Q27. What data layout does the physics use?**
 Array-of-objects. Every body is `{ position: {x,y,z}, velocity: {x,y,z}, ... }`
 and `Vector.toObject()` allocates a **fresh** `{x,y,z}` literal per body per
-sub-step. `new Vector()` is additionally allocated *inside* `BHAccelerate`,
+sub-step. `new Vector()` is additionally allocated _inside_ `BHAccelerate`,
 `generateChildren`, `insertMassInTree` and `fixCoM` — i.e. inside the hot
 recursion. **Confidence: High.** `UP:euler.ts`, `UP:rkn-base.ts`.
 
@@ -221,16 +222,17 @@ I did not audit all 4,435 files. To resolve: schema-scan every file for a
 citation key.
 
 **Q32. Which authoritative sources are openly usable?**
+
 - **JPL Horizons** (SSD/CNEO, NASA/Caltech) — ephemerides and state vectors.
 - **NASA Exoplanet Archive** (IPAC/Caltech) — confirmed exoplanet parameters.
 - **IAU / NASA planetary fact sheets** — masses, radii, rotation.
-All are US-government-funded public data. **Confidence: High** that these exist
-and are the canonical sources; **Medium** on per-dataset reuse terms — each
-must be checked at ingest time and recorded per scenario. Reuse terms are a
-licensing question, answered in `04-licensing-and-clean-room.md`.
+  All are US-government-funded public data. **Confidence: High** that these exist
+  and are the canonical sources; **Medium** on per-dataset reuse terms — each
+  must be checked at ingest time and recorded per scenario. Reuse terms are a
+  licensing question, answered in `04-licensing-and-clean-room.md`.
 
 **Q33. Should the rebuild embed a full ephemeris?**
-No. Ship *initial conditions* (epoch + state vectors) with a citation, and
+No. Ship _initial conditions_ (epoch + state vectors) with a citation, and
 integrate forward. Embedding full ephemerides would bloat the bundle and add
 a data-licensing surface for no user benefit. **Confidence: High.**
 
@@ -256,7 +258,7 @@ labels. **Confidence: High.** `UP:package.json`; `LIVE:` two `<canvas>` elements
 
 **Q37. Is per-frame physics state held in React/Redux?**
 **Yes — twice over, and this is the single worst performance defect.** Each
-frame the scene (a) deep-clones the *entire* Redux state with
+frame the scene (a) deep-clones the _entire_ Redux state with
 `JSON.parse(JSON.stringify(this.store.getState()))`, and (b) dispatches the
 whole `masses` array back into the store via `modifyScenarioProperty`. So every
 frame does a full serialise + parse + reducer pass + subscriber notification
@@ -316,7 +318,7 @@ announcing state changes). Automated axe checks in CI plus a scripted
 keyboard-only walkthrough. **Confidence: High** (design decision).
 
 **Q46. Can a gravity simulator be meaningfully accessible?**
-The 3D view cannot be made equivalent for a blind user, but the *information*
+The 3D view cannot be made equivalent for a blind user, but the _information_
 can: body list, orbital elements, conservation diagnostics and play state are
 all expressible as semantic HTML. The honest posture is "the data is fully
 accessible; the visualisation is an enhancement." **Confidence: Medium.**
@@ -393,14 +395,14 @@ privacy-preserving, self-hosted, cookieless measurement if any is used.
 **Q56. What security headers does the live site send?**
 Verified 21/09/2026 (grade **B**, server: Netlify, IP 35.157.26.135):
 
-| Header | Value | Verdict |
-|---|---|---|
-| `content-security-policy` | `frame-ancestors 'none'` | present but **no `default-src`/`script-src`** — no XSS mitigation |
-| `strict-transport-security` | `max-age=31536000` | present, **no `includeSubDomains`, no `preload`** |
-| `x-frame-options` | `DENY` | present |
-| `x-content-type-options` | — | **missing** |
-| `referrer-policy` | — | **missing** |
-| `permissions-policy` | — | **missing** |
+| Header                      | Value                    | Verdict                                                           |
+| --------------------------- | ------------------------ | ----------------------------------------------------------------- |
+| `content-security-policy`   | `frame-ancestors 'none'` | present but **no `default-src`/`script-src`** — no XSS mitigation |
+| `strict-transport-security` | `max-age=31536000`       | present, **no `includeSubDomains`, no `preload`**                 |
+| `x-frame-options`           | `DENY`                   | present                                                           |
+| `x-content-type-options`    | —                        | **missing**                                                       |
+| `referrer-policy`           | —                        | **missing**                                                       |
+| `permissions-policy`        | —                        | **missing**                                                       |
 
 **Confidence: High.** Raw response headers.
 
@@ -440,7 +442,7 @@ Yes. The v2 footer reads "Copyright © Darrell Arjuna Huffman 2024".
 **Confidence: High.** `LIVE:` v2 footer.
 
 **Q62. What does that ambiguity mean for us?**
-It makes reuse *riskier*, not safer. A missing licence file does not place code
+It makes reuse _riskier_, not safer. A missing licence file does not place code
 in the public domain; the default is exclusive copyright, and the `package.json`
 string signals copyleft intent. Building on it would mean taking on GPLv3
 obligations of uncertain scope. **Confidence: High** on the copyright default;
@@ -450,7 +452,7 @@ the strategic conclusion is in `04-licensing-and-clean-room.md`.
 **Clean-room.** No upstream code, assets, scenario files, shaders, text or
 implementation structure is copied. Physics is implemented from published
 scientific method; data comes from openly licensed primary sources with
-per-scenario citation. This is also the *cheapest* path here, because
+per-scenario citation. This is also the _cheapest_ path here, because
 `logiagenesis/gravity` is empty — there is no existing derivation to unwind.
 **Confidence: High.**
 
@@ -477,7 +479,7 @@ whole class of security surface. **Confidence: High.**
 ## M. Monetisation (Q67–Q69)
 
 **Q67. Is the current model working?**
-**UNKNOWN** — no revenue data. What *is* verifiable is that it is implemented in
+**UNKNOWN** — no revenue data. What _is_ verifiable is that it is implemented in
 the most user-hostile available way: ads in the `<head>` of the simulation page,
 contradicting the project's own stated policy (Q7).
 
@@ -542,13 +544,13 @@ These genuinely cannot be answered by inspection, research or measurement. I
 have **proceeded on the stated default** for each so that no work is blocked;
 each is cheap to change later.
 
-| # | Question | Default I am proceeding on | Cost to change later |
-|---|---|---|---|
-| B1 | Is the rebuild proprietary or open-source? | **Clean-room, no upstream code**, licence left unset | Low — clean-room is safe either way |
-| B2 | Keep ads at all? | **No ads anywhere in the new app**; no ad code written | Low |
-| B3 | Analytics vendor and consent posture? | **No analytics shipped**; no third-party requests | Low |
-| B4 | Migrate the 4,435 upstream scenarios, or build a fresh catalogue? | **Fresh, clean-room scenarios from primary sources** | Medium — a pipeline exists either way |
-| B5 | Will `gravitysimulator.org` DNS point at the rebuild, and does v1 stay up? | **Assume a clean single-origin deploy**; no redirect map written | Medium — needs a redirect plan if v1 URLs must survive |
-| B6 | Target audience priority: general public vs classroom? | **Learner-first, classroom-capable** | Low |
+| #   | Question                                                                   | Default I am proceeding on                                       | Cost to change later                                   |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
+| B1  | Is the rebuild proprietary or open-source?                                 | **Clean-room, no upstream code**, licence left unset             | Low — clean-room is safe either way                    |
+| B2  | Keep ads at all?                                                           | **No ads anywhere in the new app**; no ad code written           | Low                                                    |
+| B3  | Analytics vendor and consent posture?                                      | **No analytics shipped**; no third-party requests                | Low                                                    |
+| B4  | Migrate the 4,435 upstream scenarios, or build a fresh catalogue?          | **Fresh, clean-room scenarios from primary sources**             | Medium — a pipeline exists either way                  |
+| B5  | Will `gravitysimulator.org` DNS point at the rebuild, and does v1 stay up? | **Assume a clean single-origin deploy**; no redirect map written | Medium — needs a redirect plan if v1 URLs must survive |
+| B6  | Target audience priority: general public vs classroom?                     | **Learner-first, classroom-capable**                             | Low                                                    |
 
 **Nothing in the build below depends on B1–B6 being answered first.**
