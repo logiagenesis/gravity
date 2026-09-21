@@ -36,8 +36,15 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run preview",
+    // Must match the address `npm run preview` binds to. Vite's default
+    // "localhost" can resolve to ::1 while this poll targets IPv4, in which
+    // case the server never looks ready and the wait times out.
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // Surface the server's own output, so a startup failure shows the reason
+    // rather than only a timeout.
+    stdout: "pipe",
+    stderr: "pipe",
   },
 });
