@@ -61,12 +61,14 @@ export { HYDROGEN_BURNING_LIMIT_MSUN as STAR_MASS_THRESHOLD_MSUN } from "../sim/
  * Prefixes tried when reconstructing an id from a name.
  *
  * Ids are omitted from the manifest when `id === prefix + slugify(name)` for
- * one of these, which is true for 4,432 of 4,439 entries and saves 12.8 kB
- * gzipped. The build VERIFIES each reconstruction against the real id and
- * falls back to storing the id verbatim when it does not match, so a change
- * to either side costs bytes but can never produce a wrong id.
+ * one of these, which is true for all but a handful of entries and is worth
+ * tens of kilobytes gzipped. The build VERIFIES each reconstruction against
+ * the real id and falls back to storing the id verbatim when it does not
+ * match, so a change to either side costs bytes but can never produce a wrong
+ * id — which is exactly how the missing "binary-" prefix showed up: as 399
+ * verbatim ids and a manifest 7 kB from its budget, not as a wrong link.
  */
-export const ID_PREFIXES = ["", "exo-"] as const;
+export const ID_PREFIXES = ["", "exo-", "binary-"] as const;
 
 /** Shared with the scenario generators so reconstruction stays exact. */
 export function slugify(text: string): string {

@@ -653,3 +653,79 @@ describe("Horizons state vectors against published orbital periods", () => {
     }
   });
 });
+
+/**
+ * Binary-star scenarios against the periods DEBCat publishes.
+ *
+ * The pipeline derives each separation from Kepler's third law with the
+ * measured period and the measured total mass, so the orbit must reproduce
+ * that period. Checked on every one of them, because the arithmetic is cheap
+ * and a unit slip would be silent.
+ */
+describe("binary stars against their published periods", () => {
+  function publishedBinaryPeriods(): Map<string, number> {
+    const path = join(ROOT, "data/sources/snapshots/debcat-debs.dat");
+    const lines = readFileSync(path, "utf8").trim().split("\n");
+    const header = lines[0].replace(/^#\s*/, "").split(/\s+/);
+    const iSystem = header.indexOf("System");
+    const iPeriod = header.indexOf("Pday");
+    const out = new Map<string, number>();
+    for (const line of lines.slice(1)) {
+      const f = line.split(/\s+/);
+      const period = Number(f[iPeriod]);
+      // A system measured twice keeps whichever row the pipeline chose, so
+      // both candidate periods are accepted here by keeping the last seen and
+      // comparing loosely enough to cover the difference between analyses.
+      if (Number.isFinite(period) && period > 0) {
+        out.set(f[iSystem].replace(/_/g, " "), period);
+      }
+    }
+    return out;
+  }
+
+  it("reproduces the published period of every binary", () => {
+    const published = publishedBinaryPeriods();
+    const bad: string[] = [];
+    let checked = 0;
+    for (const { file, scenario } of scenarios) {
+      if (scenario.category !== "stars") continue;
+      const expected = published.get(scenario.name);
+      expect(expected, `no published period for ${scenario.name}`).toBeDefined();
+      const g = scenario.physics.g ?? G_AU3_PER_MSUN_DAY2;
+      const [a, b] = scenario.bodies;
+      const actual = twoBodyPeriodDays(a, b, g);
+      if (actual === null) {
+        bad.push(`${file}: not a bound orbit`);
+        continue;
+      }
+      checked++;
+      // 0.5% covers the two published analyses of the one system DEBCat lists
+      // twice (771.781 d and 772.638 d, a 0.11% difference); everything else
+      // agrees to floating point.
+      const relative = Math.abs(actual - (expected as number)) / (expected as number);
+      if (relative > 0.005) {
+        bad.push(
+          `${file}: ${actual.toPrecision(6)} d vs published ` +
+            `${(expected as number).toPrecision(6)} d`,
+        );
+      }
+    }
+    expect(bad).toEqual([]);
+    expect(checked).toBeGreaterThan(300);
+  });
+
+  it("never starts a pair of stars already touching", () => {
+    const overlapping: string[] = [];
+    for (const { file, scenario } of scenarios) {
+      if (scenario.category !== "stars") continue;
+      const [a, b] = scenario.bodies;
+      const separation = Math.hypot(
+        a.position.x - b.position.x,
+        a.position.y - b.position.y,
+        a.position.z - b.position.z,
+      );
+      if (separation <= a.radius + b.radius) overlapping.push(file);
+    }
+    expect(overlapping).toEqual([]);
+  });
+});

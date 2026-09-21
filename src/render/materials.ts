@@ -45,6 +45,30 @@ export function inferBodyClass(massSolar: number, explicit?: string): BodyClass 
   return "rocky";
 }
 
+/** What a body is drawn as when its scenario gives no colour. */
+export const UNSPECIFIED_BODY_COLOUR = "#b9c2cc";
+
+/**
+ * The colour to draw a body in.
+ *
+ * The SCENARIO wins whenever it says anything, because it is the scenario
+ * that knows the body's effective temperature and the renderer that does not.
+ * Every pipeline in this project derives its colours from a measured or
+ * published temperature, so honouring them is honouring the data: CM Dra is a
+ * pair of 3,100 K M-dwarfs and rendered as two white suns until this stopped
+ * hard-coding 5,772 K for every star.
+ *
+ * An empty string means "the scenario did not say", which is not the same as
+ * white. Only then does a star fall back to Sun-like and anything else to a
+ * neutral grey.
+ */
+export function bodyColour(colour: string, bodyClass: BodyClass): THREE.Color {
+  if (colour !== "") return new THREE.Color(colour);
+  return bodyClass === "star"
+    ? starColour(5772)
+    : new THREE.Color(UNSPECIFIED_BODY_COLOUR);
+}
+
 /**
  * Approximate RGB for a blackbody temperature, used for star colour.
  * Piecewise fit to the familiar O-B-A-F-G-K-M progression; good enough to make

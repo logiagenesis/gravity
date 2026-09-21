@@ -71,6 +71,15 @@ export const CATEGORY_COPY: Record<string, { title: string; blurb: string }> = {
       "orbital phases are spread evenly and are not the real phases, so these are " +
       "models of each system, not ephemerides.",
   },
+  stars: {
+    title: "Stars",
+    blurb:
+      "Detached eclipsing binaries, where both stars' masses and radii have " +
+      "actually been measured rather than inferred. These are the systems " +
+      "astronomy weighs stars with, and the cleanest two-body problem there is: " +
+      "two comparable masses circling a common barycentre. Orbits are assumed " +
+      "circular, which each scenario states.",
+  },
   choreographies: {
     title: "Choreographies",
     blurb:

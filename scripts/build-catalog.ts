@@ -476,6 +476,20 @@ function main(): void {
       `${kb(gzipBytes)} gzip (budget ${kb(MANIFEST_BUDGET_GZIP_BYTES)}).`,
   );
 
+  const worstFraction = Math.max(
+    rawBytes / MANIFEST_BUDGET_RAW_BYTES,
+    gzipBytes / MANIFEST_BUDGET_GZIP_BYTES,
+  );
+  // Warn before the wall, not at it: a budget that only speaks when it is
+  // already broken makes the next data source someone else's emergency.
+  if (worstFraction > 0.85 && worstFraction <= 1) {
+    console.warn(
+      `\nWARNING: the manifest is at ${(worstFraction * 100).toFixed(0)}% of budget. ` +
+        `The next substantial data source will exceed it. The remedy is to shard ` +
+        `by category and fetch shards on demand, not to raise the number.`,
+    );
+  }
+
   if (rawBytes > MANIFEST_BUDGET_RAW_BYTES || gzipBytes > MANIFEST_BUDGET_GZIP_BYTES) {
     console.error(
       `\nThe manifest is over budget. Shard it by category and teach ` +

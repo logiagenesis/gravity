@@ -21,7 +21,7 @@ import {
   createBodyMaterial,
   createGlowTexture,
   inferBodyClass,
-  starColour,
+  bodyColour,
   type BodyMaterial,
 } from "./materials";
 import { createStarfield } from "./starfield";
@@ -279,10 +279,7 @@ export class GravityScene {
       const geometry = new THREE.SphereGeometry(1, 32, 20);
       meta.forEach((body, index) => {
         const bodyClass = inferBodyClass(body.mass);
-        const base =
-          bodyClass === "star"
-            ? starColour(5772) // Sun-like default; temperature arrives with the pipeline
-            : new THREE.Color(body.colour);
+        const base = bodyColour(body.colour, bodyClass);
         const material = createBodyMaterial(bodyClass, base, index * 7.13 + 1.7);
         const mesh = new THREE.Mesh(geometry, material.material);
         mesh.frustumCulled = false;
@@ -312,7 +309,7 @@ export class GravityScene {
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
       meta.forEach((body, index) => {
-        this.colour.set(body.colour);
+        this.colour.copy(bodyColour(body.colour, inferBodyClass(body.mass)));
         mesh.setColorAt(index, this.colour);
       });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
