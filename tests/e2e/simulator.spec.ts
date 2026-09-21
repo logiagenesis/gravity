@@ -10,7 +10,11 @@ async function openTab(page: Page, name: string) {
   if (!(await tab.isVisible())) {
     await page.getByRole("button", { name: /Show details panel/ }).click();
   }
+  // Wait for the tab rather than clicking whatever is there: the panel can be
+  // mid-transition, and under a loaded suite that raced and timed out.
+  await expect(tab).toBeVisible();
   await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
 }
 
 test.beforeEach(async ({ page }) => {
@@ -185,6 +189,9 @@ test.describe("simulator", () => {
 
   test("a scenario without a camera target follows nothing", async ({ page }) => {
     await page.goto("/#/scenario/figure-eight-choreography");
+    // beforeEach loaded a different scenario, so wait for this one to arrive
+    // before touching the panel.
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Figure-Eight");
     await openTab(page, "Bodies");
     await expect(
       page.getByRole("button", { name: "Body A", exact: true }),
