@@ -235,3 +235,59 @@ there is none.
 **Verified now:** the upstream clone is at
 `/home/user/thehappykoala/harmony-of-the-spheres`, entirely outside
 `/home/user/gravity`. No file has been copied between them.
+
+---
+
+## 11. Third-party data sources — checked before use
+
+Rule 3 of the remediation brief: every third-party asset or dataset gets a row
+here with source URL, licence/terms and the date checked **before** it is
+committed. This section is maintained as sources are added.
+
+### NASA Exoplanet Archive — Planetary Systems Composite Parameters (`pscomppars`)
+
+| Field                        | Value                                                                                                                                                                                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source URL**               | https://exoplanetarchive.ipac.caltech.edu/TAP/sync (TAP service, table `pscomppars`)                                                                                                                                                    |
+| **Operator**                 | California Institute of Technology, under contract with NASA, Exoplanet Exploration Program                                                                                                                                             |
+| **Terms**                    | Freely available to the community. The archive _requests_ citation and acknowledgement rather than imposing a restrictive licence                                                                                                       |
+| **Date checked**             | 21/09/2026                                                                                                                                                                                                                              |
+| **Required acknowledgement** | "This research has made use of the NASA Exoplanet Archive, which is operated by the California Institute of Technology, under contract with the National Aeronautics and Space Administration under the Exoplanet Exploration Program." |
+| **Requested citation**       | Christiansen et al. (2025), the archive's overview paper                                                                                                                                                                                |
+| **What we ingest**           | Numerical parameters only: planet and host names, semi-major axis, eccentricity, planet mass and radius, stellar mass/radius/effective temperature, planet count. **No prose, no images.**                                              |
+| **Rows available**           | 5,905 planets with the minimum usable set (a, M★, Mp) as of the retrieval date                                                                                                                                                          |
+| **Verdict**                  | ✅ **Usable.** Facts are not copyrightable, the archive explicitly invites reuse, and the acknowledgement is discharged per scenario in the mandatory `source` block plus a site-wide credit                                            |
+
+**How the acknowledgement is discharged.** Every generated scenario carries the
+acknowledgement text in `source.notes` and the archive in `source.provider`, so
+the credit travels with the data rather than living only in a footer a user may
+never see. The site-wide credit additionally appears on the About page.
+
+**Access note.** This session's egress proxy blocks
+`exoplanetarchive.ipac.caltech.edu` directly, and CI has no access to it either.
+The pipeline therefore reads a **committed CSV snapshot** rather than querying
+at build time — which is also what makes builds reproducible and offline-safe.
+The snapshot records the exact ADQL query and retrieval date so it can be
+regenerated and audited.
+
+### NASA JPL Solar System Dynamics / NSSDCA Planetary Fact Sheet
+
+Already in use for the hand-built solar-system scenarios; recorded here for
+completeness.
+
+| Field              | Value                                                                                                    |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Source URL**     | https://ssd.jpl.nasa.gov/planets/approx_pos.html · https://nssdc.gsfc.nasa.gov/planetary/factsheet/      |
+| **Operator**       | NASA JPL / NASA Goddard (NSSDCA)                                                                         |
+| **Terms**          | US-government-funded public data; NASA generally permits reuse of unrestricted material with attribution |
+| **Date checked**   | 21/09/2026                                                                                               |
+| **What we ingest** | Numerical parameters only (masses, radii, semi-major axes, eccentricities)                               |
+| **Verdict**        | ✅ Usable with attribution, which every scenario carries                                                 |
+
+### Sources considered and NOT used
+
+| Source                                        | Why not                                                                                                                                                                                       |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| JPL Horizons spacecraft ephemerides           | Would enable a Spaceflight category. **Not yet evaluated** — its access route and terms need the same check as the rows above before any use. Recorded as pending rather than quietly skipped |
+| Planetary surface textures (NASA/JPL imagery) | Not needed: M3 renders procedural surfaces in-shader, which avoids the download cost and the per-image licensing check entirely                                                               |
+| Any Harmony of the Spheres scenario JSON      | Clean-room rule. Their files are not ours to copy, and the same primary sources are directly available                                                                                        |
