@@ -18,6 +18,7 @@ const SimulatorPage = lazy(() =>
 );
 import { SavedPage } from "./SavedPage";
 import { BuildPage } from "./BuildPage";
+import { isEmbedded, fullSiteUrl } from "./embed";
 import { AboutPage, PrivacyPage } from "./StaticPages";
 import { loadCatalogue } from "../catalog";
 import { decodeScenario, sharePayloadFromHash } from "../share/link";
@@ -70,6 +71,12 @@ function parseHash(hash: string): Route {
 }
 
 export function App() {
+  /*
+   * Read once. The embedding is a property of how the page was opened, not of
+   * where the visitor has navigated to since, and the hash router changes the
+   * hash constantly.
+   */
+  const [embedded] = useState(() => isEmbedded(globalThis.location.search));
   const [route, setRoute] = useState<Route>(() => parseHash(globalThis.location.hash));
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -256,49 +263,72 @@ export function App() {
     <div
       className="app"
       data-immersive={immersive && scenario !== null ? "true" : "false"}
+      data-embed={embedded ? "true" : "false"}
     >
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
 
-      <header className="site-header">
-        <a className="brand" href="#/">
-          <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-            <ellipse
-              cx="32"
-              cy="32"
-              rx="26"
-              ry="10"
-              fill="none"
-              stroke="currentColor"
-              strokeOpacity="0.5"
-              strokeWidth="3"
-              transform="rotate(-20 32 32)"
-            />
-            <circle cx="32" cy="32" r="10" fill="#ffd27f" />
-            <circle cx="56" cy="23" r="4" fill="#6b93d6" />
-          </svg>
-          <span>Gravity Simulator</span>
-        </a>
-        <nav aria-label="Main">
-          <ul>
-            {navLink(
-              "#/",
-              "Scenarios",
-              route.kind === "catalogue" || route.kind === "category",
-            )}
-            {navLink("#/build", "Build", route.kind === "build")}
-            {navLink("#/saved", "Saved", route.kind === "saved")}
-            {navLink("#/about", "About", route.kind === "about")}
-          </ul>
-        </nav>
-      </header>
+      {embedded ? (
+        /*
+         * Embedded: one line of attribution instead of a site header.
+         *
+         * It is not decoration. A simulation sitting inside somebody else's
+         * page with no way to tell what it is, or to reach the sources behind
+         * its numbers, is a page presenting this work as its own. The link
+         * points at wherever this copy is deployed, derived from the page's
+         * own base URL — we do not control the domain, so there is no correct
+         * constant to hardcode.
+         */
+        <p className="embed-attribution">
+          <a
+            href={fullSiteUrl(import.meta.env.BASE_URL, globalThis.location.origin)}
+            target="_blank"
+            rel="noopener"
+          >
+            Gravity Simulator — open the full version
+          </a>
+        </p>
+      ) : (
+        <header className="site-header">
+          <a className="brand" href="#/">
+            <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+              <ellipse
+                cx="32"
+                cy="32"
+                rx="26"
+                ry="10"
+                fill="none"
+                stroke="currentColor"
+                strokeOpacity="0.5"
+                strokeWidth="3"
+                transform="rotate(-20 32 32)"
+              />
+              <circle cx="32" cy="32" r="10" fill="#ffd27f" />
+              <circle cx="56" cy="23" r="4" fill="#6b93d6" />
+            </svg>
+            <span>Gravity Simulator</span>
+          </a>
+          <nav aria-label="Main">
+            <ul>
+              {navLink(
+                "#/",
+                "Scenarios",
+                route.kind === "catalogue" || route.kind === "category",
+              )}
+              {navLink("#/build", "Build", route.kind === "build")}
+              {navLink("#/saved", "Saved", route.kind === "saved")}
+              {navLink("#/about", "About", route.kind === "about")}
+            </ul>
+          </nav>
+        </header>
+      )}
 
       <main className="main" id="main" tabIndex={-1}>
         {renderRoute()}
       </main>
 
-      {!immersive && (
+      {!immersive && !embedded && (
         <footer className="site-footer">
           <p>
             An interactive n-body gravity simulator. Physics runs off the main thread,

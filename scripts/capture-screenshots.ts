@@ -103,6 +103,16 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "m5-desktop-embed",
+    path: "?embed=1#/scenario/earth-and-moon",
+    viewport: DESKTOP,
+  },
+  {
+    name: "m5-mobile-embed",
+    path: "?embed=1#/scenario/earth-and-moon",
+    viewport: MOBILE,
+  },
+  {
     name: "m5-desktop-build",
     path: "#/build",
     viewport: DESKTOP,
@@ -171,6 +181,7 @@ async function main(): Promise<void> {
       }
     });
 
+    // `path` may be a hash route or a query string plus one.
     await page.goto(`${BASE_URL}/${shot.path}`, { waitUntil: "load" });
     // Wait for the app to render something, not a fixed delay.
     await page.getByRole("heading", { level: 1 }).waitFor({ timeout: 30_000 });

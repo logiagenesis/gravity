@@ -1287,7 +1287,9 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
       <div className="sim__labels" ref={labelsRef} />
 
       <div className="sim__head">
-        <button type="button" className="btn btn--ghost" onClick={onBack}>
+        {/* Hidden in the embedded view by CSS, where the attribution link is
+            the single way out and two competing ones would crowd the corner. */}
+        <button type="button" className="btn btn--ghost sim__back" onClick={onBack}>
           ← Scenarios
         </button>
         <div className="sim__title">

@@ -1538,3 +1538,69 @@ kbd {
 .build-template .btn {
   align-self: flex-start;
 }
+
+/* -------------------------------------------------------------------------
+   Embedded view (?embed=1)
+
+   The host page supplies its own navigation, so this one gets out of the way.
+   What stays is the simulation, its controls, its warnings, its citation, and
+   one line saying what this is.
+   ------------------------------------------------------------------------- */
+.embed-attribution {
+  position: absolute;
+  top: var(--s-2);
+  left: var(--s-2);
+  z-index: 9;
+  margin: 0;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radius-sm);
+  background: var(--overlay);
+  font-size: var(--fs-xs);
+}
+
+.embed-attribution a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.embed-attribution a:hover,
+.embed-attribution a:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* The simulator already fills the viewport; an embedded non-simulator page
+   still needs its own padding, since the site header is not there to give it
+   any. */
+.app[data-embed="true"] .main {
+  padding-top: var(--s-6);
+}
+.app[data-embed="true"][data-immersive="true"] .main {
+  padding-top: 0;
+}
+
+/*
+ * The canvas normally leaves room for the site header it sits under. With no
+ * header, that reservation became a black band along the bottom of the frame.
+ */
+.app[data-embed="true"] .sim {
+  height: 100dvh;
+}
+
+/*
+ * One way out, not two. The attribution link occupies the top-left corner in
+ * an embed, and the simulator's own "← Scenarios" would sit on top of it. The
+ * catalogue is still reachable at ?embed=1#/ for a host page that wants it.
+ */
+.app[data-embed="true"] .sim__back {
+  display: none;
+}
+
+/*
+ * ...and with the back button gone, the scenario title slid left UNDER the
+ * attribution. Both are absolutely positioned over the canvas, so neither
+ * pushes the other: the head gets an explicit offset for the line above it.
+ */
+.app[data-embed="true"] .sim__head {
+  top: calc(var(--s-3) + 26px);
+}
