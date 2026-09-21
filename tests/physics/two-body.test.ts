@@ -57,7 +57,7 @@ function radialWobble(a: number, dtDivisor: number, orbits: number): number {
     g: 1,
     dt: period / dtDivisor,
     integrator: "verlet",
-    collisionsEnabled: false,
+    collisionMode: "pass-through",
   });
   const steps = Math.round((orbits * period) / sim.dt);
   let minSep = Infinity;
@@ -110,7 +110,7 @@ describe("two-body circular orbit", () => {
       g: 1,
       dt,
       integrator: "pefrl",
-      collisionsEnabled: false,
+      collisionMode: "pass-through",
     });
 
     const start = Array.from(sim.state.positions.slice(0, 6));
@@ -144,7 +144,7 @@ describe("two-body elliptical orbit", () => {
       g: 1,
       dt: 1e-5,
       integrator: "verlet",
-      collisionsEnabled: false,
+      collisionMode: "pass-through",
     });
 
     const before = sim.diagnostics();

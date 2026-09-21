@@ -26,6 +26,53 @@
  */
 import type { SimState } from "./state";
 
+/**
+ * What happens when two bodies touch.
+ *
+ *   merge         perfectly inelastic. Momentum conserved, kinetic energy
+ *                 decreases — the loss is what physically becomes heat and
+ *                 deformation.
+ *   elastic       perfectly restituting. Momentum AND kinetic energy both
+ *                 conserved; the bodies bounce and both survive.
+ *   pass-through  no contact response at all. Gravity still acts, so bodies
+ *                 fall through one another. Useful for point-mass questions,
+ *                 and honest about being unphysical for real spheres.
+ */
+export const COLLISION_MODES = ["merge", "elastic", "pass-through"] as const;
+export type CollisionMode = (typeof COLLISION_MODES)[number];
+
+export interface CollisionModeInfo {
+  readonly mode: CollisionMode;
+  readonly label: string;
+  /** What a reader should expect the conservation readouts to do. */
+  readonly conserves: string;
+}
+
+export const COLLISION_MODE_INFO: readonly CollisionModeInfo[] = [
+  {
+    mode: "merge",
+    label: "Merge",
+    conserves:
+      "Momentum is conserved exactly. Kinetic energy DROPS, because a merge is " +
+      "perfectly inelastic — expect the energy readout to step down.",
+  },
+  {
+    mode: "elastic",
+    label: "Bounce",
+    conserves:
+      "Momentum and kinetic energy are both conserved. Bodies rebound and both " +
+      "survive, so the body count never changes.",
+  },
+  {
+    mode: "pass-through",
+    label: "Pass through",
+    conserves:
+      "Nothing is applied on contact, so bodies fall through each other. " +
+      "Gravity still acts, and at very close range it becomes enormous unless " +
+      "softening is switched on.",
+  },
+];
+
 export interface CollisionEvent {
   /** Names of every body absorbed into the survivor. */
   absorbed: string[];
@@ -49,10 +96,84 @@ function findRoot(parent: Int32Array, i: number): number {
 }
 
 /**
- * Detect overlapping bodies and merge each overlapping cluster.
- * Returns one event per merge performed.
+ * Perfectly elastic response for every approaching overlapping pair.
+ *
+ * Along the line of centres, with n the unit vector from i to j:
+ *
+ *   J = -(1 + e) (v_rel . n) / (1/mi + 1/mj),   e = 1
+ *   vi -= (J / mi) n        vj += (J / mj) n
+ *
+ * Momentum is conserved by construction: the impulses are equal and opposite.
+ * At e = 1 kinetic energy is conserved too, which is the standard result and
+ * is asserted in tests rather than assumed.
+ *
+ * A pair that is already SEPARATING is skipped. Without that, two bodies that
+ * remain overlapped for several steps would have the impulse applied again
+ * and again and gain energy from nothing.
+ *
+ * Multiple simultaneous contacts are resolved pairwise in index order. That is
+ * an approximation — a true simultaneous three-body contact is not a sequence
+ * of two-body ones — and it is the standard one; it conserves momentum
+ * exactly either way.
  */
-export function resolveCollisions(state: SimState): CollisionEvent[] {
+function resolveElastic(state: SimState): void {
+  const { positions, velocities, masses, radii, count } = state;
+  for (let i = 0; i < count; i++) {
+    if (state.isMassless(i)) continue;
+    const i3 = i * 3;
+    for (let j = i + 1; j < count; j++) {
+      if (state.isMassless(j)) continue;
+      const j3 = j * 3;
+      const dx = positions[j3] - positions[i3];
+      const dy = positions[j3 + 1] - positions[i3 + 1];
+      const dz = positions[j3 + 2] - positions[i3 + 2];
+      const contact = radii[i] + radii[j];
+      const distanceSquared = dx * dx + dy * dy + dz * dz;
+      if (distanceSquared >= contact * contact || distanceSquared === 0) continue;
+
+      const distance = Math.sqrt(distanceSquared);
+      const nx = dx / distance;
+      const ny = dy / distance;
+      const nz = dz / distance;
+
+      const rvx = velocities[j3] - velocities[i3];
+      const rvy = velocities[j3 + 1] - velocities[i3 + 1];
+      const rvz = velocities[j3 + 2] - velocities[i3 + 2];
+      const approach = rvx * nx + rvy * ny + rvz * nz;
+      if (approach >= 0) continue; // already separating
+
+      const mi = masses[i];
+      const mj = masses[j];
+      const inverseMassSum = 1 / mi + 1 / mj;
+      if (!Number.isFinite(inverseMassSum) || inverseMassSum === 0) continue;
+      const impulse = (-2 * approach) / inverseMassSum;
+
+      velocities[i3] -= (impulse / mi) * nx;
+      velocities[i3 + 1] -= (impulse / mi) * ny;
+      velocities[i3 + 2] -= (impulse / mi) * nz;
+      velocities[j3] += (impulse / mj) * nx;
+      velocities[j3 + 1] += (impulse / mj) * ny;
+      velocities[j3 + 2] += (impulse / mj) * nz;
+    }
+  }
+}
+
+/**
+ * Apply the contact response for `mode`.
+ *
+ * Returns one event per merge performed, which is empty for every mode but
+ * "merge" — elastic collisions remove nothing, so there is nothing to report.
+ */
+export function resolveCollisions(
+  state: SimState,
+  mode: CollisionMode = "merge",
+): CollisionEvent[] {
+  if (mode === "pass-through") return [];
+  if (mode === "elastic") {
+    resolveElastic(state);
+    return [];
+  }
+
   const { positions, velocities, masses, radii, count } = state;
   if (count < 2) return [];
 

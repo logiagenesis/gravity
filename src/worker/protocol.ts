@@ -15,6 +15,7 @@
  */
 import type { Scenario } from "../schema/scenario";
 import type { IntegratorName } from "../sim/integrators";
+import type { CollisionMode } from "../sim/collisions";
 import type { ForceMode } from "../sim/forces";
 
 export type MainToWorker =
@@ -28,7 +29,7 @@ export type MainToWorker =
   | { type: "setTimestep"; dt: number }
   | { type: "setForceMode"; mode: ForceMode | "auto" }
   | { type: "setSoftening"; softening: number }
-  | { type: "setCollisions"; enabled: boolean }
+  | { type: "setCollisionMode"; mode: CollisionMode }
   | { type: "requestSnapshot" }
   /** Hand a used buffer back so the worker can reuse it. */
   | { type: "recycle"; buffer: ArrayBuffer }
@@ -62,6 +63,20 @@ export interface SnapshotMessage {
   angularMomentumDrift: number;
   /** Times the drift baseline was reset by a merge. */
   baselineResets: number;
+  /**
+   * Substeps used by the most recent outer step, and the most any step has
+   * needed since the last reset. 1 means the fixed step was already fine.
+   */
+  lastSubsteps: number;
+  peakSubsteps: number;
+  /** Closest any two bodies have come since the last reset, AU. */
+  closestApproachAu: number | null;
+  /** Shortest two-body period present, days, or null if nothing is bound. */
+  shortestPeriodDays: number | null;
+  /** Plummer softening length, AU. */
+  softening: number;
+  /** Barnes-Hut opening angle, or null when the force method is direct. */
+  theta: number | null;
   kineticEnergy: number;
   potentialEnergy: number;
   integrator: IntegratorName;

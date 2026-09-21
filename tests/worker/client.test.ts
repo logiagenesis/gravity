@@ -87,6 +87,12 @@ function snapshot(overrides: Partial<SnapshotMessage> = {}): SnapshotMessage {
     angularMomentum: 2,
     angularMomentumDrift: 1e-12,
     baselineResets: 0,
+    lastSubsteps: 1,
+    peakSubsteps: 1,
+    closestApproachAu: null,
+    shortestPeriodDays: null,
+    softening: 0,
+    theta: null,
     kineticEnergy: 1,
     potentialEnergy: -2,
     integrator: "verlet",
@@ -134,9 +140,9 @@ describe("outbound commands", () => {
       { type: "setForceMode", mode: "barnes-hut" },
     ],
     [
-      "setCollisions",
-      (c) => c.setCollisions(false),
-      { type: "setCollisions", enabled: false },
+      "setCollisionMode",
+      (c) => c.setCollisionMode("elastic"),
+      { type: "setCollisionMode", mode: "elastic" },
     ],
   ];
 

@@ -5,4 +5,4 @@ coverage
 playwright-report
 test-results
 package-lock.json
-src/catalog/generated
+# (generated catalogue output is covered by .gitignore, which Prettier also reads)

@@ -18,13 +18,14 @@ const SimulatorPage = lazy(() =>
 );
 import { SavedPage } from "./SavedPage";
 import { AboutPage, PrivacyPage } from "./StaticPages";
-import { loadScenario } from "../catalog";
+import { loadCatalogue } from "../catalog";
 import { decodeScenario, sharePayloadFromHash } from "../share/link";
 import { getSavedScenario } from "../storage/saved-scenarios";
 import type { Scenario } from "../schema/scenario";
 
 type Route =
   | { kind: "catalogue" }
+  | { kind: "category"; id: string }
   | { kind: "scenario"; id: string }
   | { kind: "saved" }
   | { kind: "savedScenario"; id: string }
@@ -44,6 +45,9 @@ function parseHash(hash: string): Route {
 
   const scenario = /^scenario\/([a-z0-9-]+)$/.exec(path);
   if (scenario) return { kind: "scenario", id: scenario[1] };
+
+  const category = /^category\/([a-z0-9-]+)$/.exec(path);
+  if (category) return { kind: "category", id: category[1] };
 
   const saved = /^saved\/(.+)$/.exec(path);
   if (saved) return { kind: "savedScenario", id: decodeURIComponent(saved[1]) };
@@ -70,7 +74,7 @@ export function App() {
     const resolve = async (): Promise<Scenario | null> => {
       switch (route.kind) {
         case "scenario":
-          return loadScenario(route.id);
+          return (await loadCatalogue()).scenario(route.id);
         case "savedScenario":
           return getSavedScenario(route.id);
         case "shared":
@@ -151,6 +155,13 @@ export function App() {
     switch (route.kind) {
       case "catalogue":
         return <CataloguePage onOpen={(id) => navigate(`#/scenario/${id}`)} />;
+      case "category":
+        return (
+          <CataloguePage
+            category={route.id}
+            onOpen={(id) => navigate(`#/scenario/${id}`)}
+          />
+        );
       case "saved":
         return (
           <SavedPage
@@ -176,33 +187,57 @@ export function App() {
     }
   };
 
+  // The simulator takes over the viewport; every other route scrolls normally.
+  const immersive =
+    route.kind === "scenario" ||
+    route.kind === "savedScenario" ||
+    route.kind === "shared";
+
+  const navLink = (href: string, label: string, active: boolean) => (
+    <li>
+      <a className="nav-link" href={href} aria-current={active ? "page" : undefined}>
+        {label}
+      </a>
+    </li>
+  );
+
   return (
-    <div className="app">
+    <div
+      className="app"
+      data-immersive={immersive && scenario !== null ? "true" : "false"}
+    >
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
 
       <header className="site-header">
         <a className="brand" href="#/">
-          Gravity Simulator
+          <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+            <ellipse
+              cx="32"
+              cy="32"
+              rx="26"
+              ry="10"
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity="0.5"
+              strokeWidth="3"
+              transform="rotate(-20 32 32)"
+            />
+            <circle cx="32" cy="32" r="10" fill="#ffd27f" />
+            <circle cx="56" cy="23" r="4" fill="#6b93d6" />
+          </svg>
+          <span>Gravity Simulator</span>
         </a>
         <nav aria-label="Main">
           <ul>
-            <li>
-              <a className="btn btn--ghost" href="#/">
-                Scenarios
-              </a>
-            </li>
-            <li>
-              <a className="btn btn--ghost" href="#/saved">
-                Saved
-              </a>
-            </li>
-            <li>
-              <a className="btn btn--ghost" href="#/about">
-                About
-              </a>
-            </li>
+            {navLink(
+              "#/",
+              "Scenarios",
+              route.kind === "catalogue" || route.kind === "category",
+            )}
+            {navLink("#/saved", "Saved", route.kind === "saved")}
+            {navLink("#/about", "About", route.kind === "about")}
           </ul>
         </nav>
       </header>
@@ -211,20 +246,23 @@ export function App() {
         {renderRoute()}
       </main>
 
-      <footer className="site-footer">
-        <p>
-          An interactive n-body gravity simulator. Physics runs off the main thread, and
-          the conservation diagnostics are shown so you can judge the results yourself.
-        </p>
-        <ul>
-          <li>
-            <a href="#/about">About</a>
-          </li>
-          <li>
-            <a href="#/privacy">Privacy</a>
-          </li>
-        </ul>
-      </footer>
+      {!immersive && (
+        <footer className="site-footer">
+          <p>
+            An interactive n-body gravity simulator. Physics runs off the main thread,
+            and the conservation diagnostics are shown so you can judge the results
+            yourself.
+          </p>
+          <ul>
+            <li>
+              <a href="#/about">About</a>
+            </li>
+            <li>
+              <a href="#/privacy">Privacy</a>
+            </li>
+          </ul>
+        </footer>
+      )}
     </div>
   );
 }

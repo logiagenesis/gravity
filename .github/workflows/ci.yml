@@ -47,12 +47,27 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Assert no foreign domain is published as our own
+        run: |
+          if grep -rl "gravitysimulator\.org" dist/ 2>/dev/null; then
+            echo "::error::dist/ references gravitysimulator.org, a domain we do not own"
+            exit 1
+          fi
+          echo "dist/ is clean of foreign canonical URLs"
+
       - name: Verify sitemap and robots were generated
         run: |
-          test -f dist/sitemap.xml || { echo "::error::dist/sitemap.xml missing"; exit 1; }
+          # CI builds with SITE_URL unset, so the CORRECT result is a robots.txt
+          # with no Sitemap line and no sitemap.xml at all. Assert that, rather
+          # than asserting the presence of a file that would have to name a
+          # guessed domain.
           test -f dist/robots.txt || { echo "::error::dist/robots.txt missing"; exit 1; }
-          grep -q "sitemap.xml" dist/robots.txt || { echo "::error::robots.txt does not reference the sitemap"; exit 1; }
-          echo "sitemap.xml and robots.txt present and consistent"
+          if [ -f dist/sitemap.xml ]; then
+            echo "::error::sitemap.xml was emitted without SITE_URL set"
+            exit 1
+          fi
+          grep -q "No Sitemap line" dist/robots.txt || { echo "::error::robots.txt should explain the missing Sitemap line"; exit 1; }
+          echo "robots.txt correctly omits the Sitemap line when SITE_URL is unset"
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
@@ -67,6 +82,16 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+      # Make every branch's build inspectable without deploying it.
+      - name: Upload built site
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: warn
 
   audit:
     runs-on: ubuntu-latest

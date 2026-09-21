@@ -1,31 +1,40 @@
 /**
  * Simulator.
  *
- * Two architectural rules are load-bearing here:
+ * THE CANVAS IS THE PRODUCT. The previous version put a small viewport inside a
+ * scrolling document, which read as a prototype. Here the canvas fills the
+ * viewport and every control is an overlay that can be collapsed out of the way.
+ *
+ * Two architectural rules remain load-bearing:
  *
  *  1. PER-FRAME BODY STATE NEVER ENTERS REACT. Snapshots go straight from the
  *     worker to the renderer via a ref. React state updates only for the
  *     throttled HUD, a few times a second.
  *  2. THE CANVAS IS NOT THE ONLY OUTPUT. A live table of bodies, the
- *     diagnostics, and the play state are all real semantic HTML, so the
- *     information is available without seeing the render.
+ *     diagnostics and the play state are real semantic HTML, so the information
+ *     is available without seeing the render.
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { GravityScene } from "../render/scene";
+import { GravityScene, type ScaleMode } from "../render/scene";
+import { describeFrame, type FrameKind, type FrameSpec } from "../render/frames";
+import { CameraControls } from "../render/controls";
 import { SimulationClient } from "../worker/client";
 import type { BodyMeta, SnapshotMessage } from "../worker/protocol";
 import { INTEGRATOR_INFO, type IntegratorName } from "../sim/integrators";
+import { COLLISION_MODE_INFO, type CollisionMode } from "../sim/collisions";
+import { simulationWarnings } from "../sim/warnings";
+import { DriftChart, type DriftSample } from "./components/DriftChart";
 import { DAYS_PER_JULIAN_YEAR } from "../sim/constants";
 import type { Scenario } from "../schema/scenario";
 import { Tabs } from "./components/Tabs";
 import { LiveRegion } from "./components/LiveRegion";
+import { Dialog } from "./components/Dialog";
 import { saveScenario, storageAvailable } from "../storage/saved-scenarios";
 import { buildShareUrl, exportScenarioFile, ShareLinkError } from "../share/link";
 
 /** HUD refresh rate. Deliberately slow: it is for reading, not animation. */
 const HUD_INTERVAL_MS = 250;
 
-/** Drift above this is called out as untrustworthy. */
 const DRIFT_WARN = 1e-4;
 const DRIFT_BAD = 1e-2;
 
@@ -47,9 +56,9 @@ function prefersReducedMotion(): boolean {
 function formatDuration(days: number): string {
   if (!Number.isFinite(days)) return "—";
   const abs = Math.abs(days);
-  if (abs < 1) return `${(days * 24).toFixed(2)} hours`;
-  if (abs < DAYS_PER_JULIAN_YEAR) return `${days.toFixed(2)} days`;
-  return `${(days / DAYS_PER_JULIAN_YEAR).toFixed(3)} years`;
+  if (abs < 1) return `${(days * 24).toFixed(2)} h`;
+  if (abs < DAYS_PER_JULIAN_YEAR) return `${days.toFixed(1)} d`;
+  return `${(days / DAYS_PER_JULIAN_YEAR).toFixed(2)} yr`;
 }
 
 function driftClass(drift: number): string {
@@ -58,12 +67,21 @@ function driftClass(drift: number): string {
   return "drift-good";
 }
 
+/**
+ * Compact fixed-width-ish number for the body table.
+ *
+ * Four significant figures. The table has five columns in a panel that is
+ * about 390px wide on a phone, and at five decimal places the last column was
+ * being clipped in the M4 screenshot. Four figures is more than the eye can
+ * use from a live readout and is honest about the precision anyone can
+ * actually read off a running simulation.
+ */
 function formatScientific(value: number): string {
   if (!Number.isFinite(value)) return "—";
   if (value === 0) return "0";
   return Math.abs(value) < 1e-3 || Math.abs(value) >= 1e5
-    ? value.toExponential(3)
-    : value.toFixed(5);
+    ? value.toExponential(2)
+    : value.toFixed(4);
 }
 
 interface SimulatorPageProps {
@@ -71,45 +89,131 @@ interface SimulatorPageProps {
   onBack: () => void;
 }
 
+/** Rolling window of drift samples. Old samples fall off the front. */
+const DRIFT_HISTORY_LENGTH = 180;
+
+function appendSample(
+  history: readonly DriftSample[],
+  sample: DriftSample,
+): DriftSample[] {
+  const next = [...history, sample];
+  return next.length > DRIFT_HISTORY_LENGTH
+    ? next.slice(next.length - DRIFT_HISTORY_LENGTH)
+    : next;
+}
+
 export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const labelsRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<GravityScene | null>(null);
+  const controlsRef = useRef<CameraControls | null>(null);
   const clientRef = useRef<SimulationClient | null>(null);
-  /** Latest snapshot, held in a ref so it never triggers a React render. */
   const latestRef = useRef<SnapshotMessage | null>(null);
   const positionsRef = useRef<Float32Array | null>(null);
 
   const [bodies, setBodies] = useState<BodyMeta[]>([]);
   const [hud, setHud] = useState<SnapshotMessage | null>(null);
+  /**
+   * Rolling history of the conservation errors.
+   *
+   * Sampled at the HUD's rate, not per frame: the point is a trend over
+   * minutes, and 60 Hz would fill the buffer in four seconds while making the
+   * line noisier rather than more informative.
+   */
+  const [driftHistory, setDriftHistory] = useState<{
+    energy: DriftSample[];
+    angular: DriftSample[];
+  }>({ energy: [], angular: [] });
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const [collisionMode, setCollisionMode] = useState<CollisionMode>(
+    scenario.physics.collisionMode,
+  );
+  /*
+   * Timestep and softening are held as TEXT while being typed.
+   *
+   * A number input bound to a number cannot hold "0.", "1e-" or an empty box,
+   * so typing a value mid-way through either snaps back or pushes a nonsense
+   * value into the engine on every keystroke. Text in, parsed out, and only a
+   * finite positive value is ever sent.
+   */
+  const [timestepText, setTimestepText] = useState(String(scenario.physics.dt));
+  const [softeningText, setSofteningText] = useState(
+    String(scenario.physics.softening),
+  );
   const [integrator, setIntegrator] = useState<IntegratorName>(
     scenario.physics.integrator,
   );
   const [showTrails, setShowTrails] = useState(!prefersReducedMotion());
+  const [panelOpen, setPanelOpen] = useState(
+    // Closed by default on a phone: the first thing a visitor should see is the
+    // simulation, not a table of numbers covering half the screen.
+    () =>
+      !(typeof matchMedia === "function" && matchMedia("(max-width: 900px)").matches),
+  );
+  const [helpOpen, setHelpOpen] = useState(false);
   const [announcement, setAnnounce] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("bodies");
   const [frameMs, setFrameMs] = useState(0);
+  const [frameKind, setFrameKind] = useState<FrameKind>("inertial");
+  const [primaryIndex, setPrimaryIndex] = useState(0);
+  const [secondaryIndex, setSecondaryIndex] = useState(1);
+  /*
+   * The scenario's own camera target, resolved to a body index.
+   *
+   * `camera.target` has been in the schema (and validated against the body
+   * ids) since the beginning, but nothing ever read it: the camera always
+   * framed the origin. That was invisible while every scenario was centred on
+   * its own primary, and obvious the moment the Horizons scenarios arrived —
+   * "Webb at L2" opened looking at the Sun from 0.05 AU away.
+   */
+  const initialFocus = useMemo(() => {
+    const target = scenario.camera?.target;
+    if (target === undefined) return null;
+    const index = scenario.bodies.findIndex((body) => body.id === target);
+    return index >= 0 ? index : null;
+  }, [scenario]);
+
+  const [focusIndex, setFocusIndex] = useState<number | null>(initialFocus);
+  const [showLabels, setShowLabels] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showBarycentre, setShowBarycentre] = useState(false);
+  const [scaleMode, setScaleMode] = useState<ScaleMode>("legible");
 
   const speedId = useId();
   const integratorId = useId();
+  const panelId = useId();
+  const frameId = useId();
+  const scaleId = useId();
+  const collisionId = useId();
+  const timestepId = useId();
+  const softeningId = useId();
 
   // --- worker + renderer lifecycle ------------------------------------------
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const scene = new GravityScene({ canvas, reducedMotion: prefersReducedMotion() });
+    const labelContainer = labelsRef.current;
+    if (!labelContainer) return;
+
+    const scene = new GravityScene({
+      canvas,
+      labelContainer,
+      reducedMotion: prefersReducedMotion(),
+    });
     scene.setCameraDistance(scenario.camera?.distance ?? 5);
     scene.start();
     sceneRef.current = scene;
 
+    const controls = new CameraControls(canvas, scene);
+    controlsRef.current = controls;
+
     const client = new SimulationClient({
       onSnapshot: (snapshot) => {
-        // Hot path: copy into the renderer and give the buffer straight back.
         const view = new Float32Array(snapshot.positions);
         positionsRef.current = view;
         scene.setPositions(view);
@@ -131,28 +235,106 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
 
     const onResize = () => scene.resize();
     globalThis.addEventListener("resize", onResize);
+    // The canvas is sized by CSS, so observe the element rather than the window.
+    const observer = new ResizeObserver(() => scene.resize());
+    observer.observe(canvas);
 
     return () => {
       globalThis.removeEventListener("resize", onResize);
+      observer.disconnect();
+      controls.dispose();
       client.dispose();
       scene.dispose();
+      controlsRef.current = null;
       clientRef.current = null;
       sceneRef.current = null;
     };
   }, [scenario]);
 
-  // --- throttled HUD --------------------------------------------------------
   useEffect(() => {
+    let lastResets = 0;
+    let lastStep = -1;
     const timer = setInterval(() => {
-      if (latestRef.current) setHud(latestRef.current);
+      const snapshot = latestRef.current;
+      if (snapshot) {
+        setHud(snapshot);
+        // Only record when the simulation has actually advanced, so a paused
+        // run does not scroll a flat line across the chart and push the
+        // interesting history off the end.
+        if (snapshot.stepCount !== lastStep) {
+          const rebaselined = snapshot.baselineResets > lastResets;
+          lastResets = snapshot.baselineResets;
+          lastStep = snapshot.stepCount;
+          setDriftHistory((history) => ({
+            energy: appendSample(history.energy, {
+              simDays: snapshot.simTimeDays,
+              value: snapshot.energyDrift,
+              rebaselined,
+            }),
+            angular: appendSample(history.angular, {
+              simDays: snapshot.simTimeDays,
+              value: snapshot.angularMomentumDrift,
+              rebaselined,
+            }),
+          }));
+        }
+      }
       if (sceneRef.current) setFrameMs(sceneRef.current.frameMs);
     }, HUD_INTERVAL_MS);
     return () => clearInterval(timer);
   }, []);
 
+  // A reset or a new scenario starts a new history; keeping the old one would
+  // draw a trend across two different runs.
+  useEffect(() => {
+    setDriftHistory({ energy: [], angular: [] });
+  }, [scenario]);
+
   useEffect(() => {
     sceneRef.current?.setTrailsEnabled(showTrails);
   }, [showTrails]);
+
+  useEffect(() => {
+    sceneRef.current?.setLabelsEnabled(showLabels);
+  }, [showLabels]);
+
+  useEffect(() => {
+    sceneRef.current?.setGridVisible(showGrid);
+  }, [showGrid]);
+
+  useEffect(() => {
+    sceneRef.current?.setBarycentreVisible(showBarycentre);
+  }, [showBarycentre]);
+
+  useEffect(() => {
+    sceneRef.current?.setScaleMode(scaleMode);
+  }, [scaleMode]);
+
+  useEffect(() => {
+    sceneRef.current?.setFocus(focusIndex);
+  }, [focusIndex]);
+
+  // A new scenario brings its own framing and its own contact mode with it.
+  useEffect(() => {
+    setFocusIndex(initialFocus);
+  }, [initialFocus]);
+
+  useEffect(() => {
+    setCollisionMode(scenario.physics.collisionMode);
+    setTimestepText(String(scenario.physics.dt));
+    setSofteningText(String(scenario.physics.softening));
+  }, [scenario]);
+
+  useEffect(() => {
+    const spec: FrameSpec = { kind: frameKind, primaryIndex, secondaryIndex };
+    sceneRef.current?.setFrame(spec);
+  }, [frameKind, primaryIndex, secondaryIndex]);
+
+  // Resize when the panel opens or closes: the canvas box changes.
+  useEffect(() => {
+    const id = setTimeout(() => sceneRef.current?.resize(), 60);
+    return () => clearTimeout(id);
+  }, [panelOpen]);
 
   // --- controls -------------------------------------------------------------
   const togglePlay = useCallback(() => {
@@ -179,6 +361,54 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     setAnnounce("Advanced one step.");
   }, []);
 
+  const handleTimestep = (text: string) => {
+    setTimestepText(text);
+    const value = Number(text);
+    if (Number.isFinite(value) && value > 0) clientRef.current?.setTimestep(value);
+  };
+
+  const handleSoftening = (text: string) => {
+    setSofteningText(text);
+    const value = Number(text);
+    if (Number.isFinite(value) && value >= 0) clientRef.current?.setSoftening(value);
+  };
+
+  /**
+   * Save the current view as a PNG, captioned with the scenario's name and
+   * the source its numbers came from.
+   *
+   * The citation travels with the picture deliberately: an image of a
+   * simulation shared without saying where its data came from is exactly the
+   * kind of unsourced claim this project exists not to make.
+   */
+  const handleExportImage = () => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const citation = [scenario.source.provider, scenario.source.reference]
+      .filter((part) => part.trim() !== "")
+      .join(" — ");
+    let url: string;
+    try {
+      url = scene.capturePng({ title: scenario.name, citation });
+    } catch {
+      setSaveState("The image could not be captured in this browser.");
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${scenario.id}.png`;
+    link.click();
+    setSaveState("Image saved.");
+    setAnnounce("Image saved.");
+  };
+
+  const handleCollisionMode = (mode: CollisionMode) => {
+    setCollisionMode(mode);
+    clientRef.current?.setCollisionMode(mode);
+    const info = COLLISION_MODE_INFO.find((i) => i.mode === mode);
+    setAnnounce(`On contact: ${info?.label ?? mode}.`);
+  };
+
   const handleIntegrator = (name: IntegratorName) => {
     setIntegrator(name);
     clientRef.current?.setIntegrator(name);
@@ -191,11 +421,9 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     clientRef.current?.setSpeed(value);
   };
 
-  // Keyboard shortcuts, announced in the help panel so they are discoverable.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      // Never hijack typing.
       if (
         target &&
         (target.tagName === "INPUT" ||
@@ -212,6 +440,17 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         handleReset();
       } else if (event.key === ".") {
         handleStep();
+      } else if (event.key === "?") {
+        setHelpOpen(true);
+      } else if (event.key === "f") {
+        sceneRef.current?.fitAll();
+        setAnnounce("View fitted to all bodies.");
+      } else if (event.key === "l") {
+        setShowLabels((v) => !v);
+      } else if (event.key === "c") {
+        sceneRef.current?.recentreCamera();
+        setFocusIndex(null);
+        setAnnounce("Camera recentred.");
       } else if (event.key === "+" || event.key === "=") {
         sceneRef.current?.zoomCamera(0.85);
       } else if (event.key === "-") {
@@ -235,11 +474,12 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     try {
       const url = await buildShareUrl(scenario, globalThis.location.href.split("#")[0]);
       setShareUrl(url);
+      setPanelOpen(true);
+      setActiveTab("share");
       try {
         await navigator.clipboard.writeText(url);
         setAnnounce("Share link copied to the clipboard.");
       } catch {
-        // Clipboard can be blocked; the link is shown regardless.
         setAnnounce("Share link created.");
       }
     } catch (caught) {
@@ -285,10 +525,37 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     () => INTEGRATOR_INFO.find((i) => i.name === integrator),
     [integrator],
   );
+  /*
+   * Warnings about the run's own trustworthiness.
+   *
+   * Derived from the HUD snapshot rather than held in state, so they cannot
+   * go stale, and recomputed at the HUD's rate (a few times a second) rather
+   * than per frame.
+   */
+  const warnings = useMemo(
+    () =>
+      hud === null
+        ? []
+        : simulationWarnings({
+            integrator: hud.integrator,
+            dt: hud.dt,
+            shortestPeriodDays: hud.shortestPeriodDays,
+            softening: hud.softening,
+            closestApproachAu: hud.closestApproachAu,
+            theta: hud.theta,
+            peakSubsteps: hud.peakSubsteps,
+            stepCount: hud.stepCount,
+            energyDrift: hud.energyDrift,
+          }),
+    [hud],
+  );
 
+  const collisionInfo = useMemo(
+    () => COLLISION_MODE_INFO.find((i) => i.mode === collisionMode),
+    [collisionMode],
+  );
   const positions = positionsRef.current;
 
-  /** A warning shown when the current settings are likely to misbehave. */
   const timestepWarning = useMemo(() => {
     if (!hud) return null;
     if (hud.energyDrift > DRIFT_BAD) {
@@ -306,6 +573,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     return null;
   }, [hud, integratorInfo]);
 
+  // --- panel content --------------------------------------------------------
   const bodiesPanel = (
     <>
       <p className="source-note">
@@ -326,10 +594,25 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         </thead>
         <tbody>
           {bodies.map((body, index) => (
-            <tr key={body.id}>
+            <tr key={body.id} data-focused={focusIndex === index ? "true" : undefined}>
               <th scope="row">
-                {body.name}
-                {body.massless ? " (test particle)" : ""}
+                <button
+                  type="button"
+                  className="body-focus"
+                  aria-pressed={focusIndex === index}
+                  onClick={() => {
+                    const next = focusIndex === index ? null : index;
+                    setFocusIndex(next);
+                    setAnnounce(
+                      next === null
+                        ? "Camera no longer following a body."
+                        : `Camera following ${body.name}.`,
+                    );
+                  }}
+                >
+                  {body.name}
+                  {body.massless ? " (test particle)" : ""}
+                </button>
               </th>
               <td className="value">{formatScientific(body.mass)}</td>
               <td className="value">
@@ -350,9 +633,38 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
 
   const diagnosticsPanel = (
     <>
+      <div className="drift-charts">
+        <DriftChart
+          samples={driftHistory.energy}
+          label="Energy error"
+          summary={
+            `Relative energy error over time, on a logarithmic scale from 1e-16 to 1. ` +
+            `Currently ${hud ? hud.energyDrift.toExponential(1) : "unknown"}.`
+          }
+        />
+        <DriftChart
+          samples={driftHistory.angular}
+          label="Angular momentum error"
+          summary={
+            `Relative angular momentum error over time, on a logarithmic scale from ` +
+            `1e-16 to 1. Currently ` +
+            `${hud ? hud.angularMomentumDrift.toExponential(1) : "unknown"}.`
+          }
+        />
+      </div>
+      {warnings.length > 0 && (
+        <ul className="warnings" aria-label="Warnings about this simulation">
+          {warnings.map((warning) => (
+            <li key={warning.id} className={`warning warning--${warning.severity}`}>
+              <strong>{warning.title}</strong>
+              <span>{warning.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="source-note">
-        Conservation diagnostics. In an exact integration these would never change, so
-        the drift is a direct measure of how much to trust what you are watching.
+        In an exact integration these would never change, so the drift is a direct
+        measure of how much to trust what you are watching.
       </p>
       {hud !== null && hud.baselineResets > 0 && (
         <p className="source-note">
@@ -400,6 +712,16 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               <td className="value">{hud.baselineResets}</td>
             </tr>
           )}
+          {/* Shown only once it is doing something, so it reads as "an
+              encounter is happening" rather than as permanent clutter. */}
+          {hud !== null && hud.peakSubsteps > 1 && (
+            <tr>
+              <th scope="row">Substeps (now / peak)</th>
+              <td className="value">
+                {hud.lastSubsteps} / {hud.peakSubsteps}
+              </td>
+            </tr>
+          )}
           <tr>
             <th scope="row">Force method</th>
             <td className="value">{hud?.forceMode ?? "—"}</td>
@@ -414,6 +736,259 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
           </tr>
         </tbody>
       </table>
+    </>
+  );
+
+  const bodyOptions = bodies.map((body, index) => (
+    <option key={body.id} value={index}>
+      {body.name}
+    </option>
+  ));
+
+  const settingsPanel = (
+    <>
+      <div className="field">
+        <label htmlFor={integratorId}>Integrator</label>
+        <div className="select">
+          <select
+            id={integratorId}
+            value={integrator}
+            onChange={(event) => handleIntegrator(event.target.value as IntegratorName)}
+            aria-describedby="integrator-guidance"
+          >
+            {INTEGRATOR_INFO.map((info) => (
+              <option key={info.name} value={info.name}>
+                {info.label} — order {info.order}
+                {info.symplectic ? ", symplectic" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="field-hint" id="integrator-guidance">
+          {integratorInfo?.guidance}
+        </p>
+      </div>
+
+      <div className="field">
+        <label htmlFor={collisionId}>On contact</label>
+        <div className="select">
+          <select
+            id={collisionId}
+            value={collisionMode}
+            onChange={(event) =>
+              handleCollisionMode(event.target.value as CollisionMode)
+            }
+            aria-describedby="collision-guidance"
+          >
+            {COLLISION_MODE_INFO.map((info) => (
+              <option key={info.mode} value={info.mode}>
+                {info.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {/* Each mode obeys a different conservation law, and the reader is
+            told which BEFORE they wonder why the energy readout jumped. */}
+        <p className="field-hint" id="collision-guidance">
+          {collisionInfo?.conserves}
+        </p>
+      </div>
+
+      <div className="field">
+        <label htmlFor={timestepId}>Timestep (days)</label>
+        <input
+          id={timestepId}
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={timestepText}
+          onChange={(event) => handleTimestep(event.target.value)}
+          aria-describedby="timestep-hint"
+        />
+        <p className="field-hint" id="timestep-hint">
+          {hud !== null && hud.shortestPeriodDays !== null && hud.dt > 0
+            ? `${(hud.shortestPeriodDays / hud.dt).toFixed(0)} steps per orbit of the ` +
+              `fastest body. Below about 20, the shape of the orbit is not resolved.`
+            : "Smaller is more accurate and slower."}
+        </p>
+      </div>
+
+      <div className="field">
+        <label htmlFor={softeningId}>Softening (AU)</label>
+        <input
+          id={softeningId}
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={softeningText}
+          onChange={(event) => handleSoftening(event.target.value)}
+          aria-describedby="softening-hint"
+        />
+        <p className="field-hint" id="softening-hint">
+          Replaces the force at short range with a weaker, finite one, so two bodies
+          passing very close cannot produce an infinite acceleration. Zero is exact
+          Newtonian gravity.
+        </p>
+      </div>
+
+      <div className="field">
+        <label htmlFor={frameId}>Reference frame</label>
+        <div className="select">
+          <select
+            id={frameId}
+            value={frameKind}
+            onChange={(event) => {
+              const kind = event.target.value as FrameKind;
+              setFrameKind(kind);
+              setAnnounce(
+                `Reference frame: ${describeFrame(
+                  { kind, primaryIndex, secondaryIndex },
+                  bodies.map((b) => b.name),
+                )}.`,
+              );
+            }}
+            aria-describedby="frame-hint"
+          >
+            <option value="inertial">Inertial</option>
+            <option value="barycentric">Barycentric</option>
+            <option value="body">Centred on a body</option>
+            <option value="rotating">Rotating with a pair</option>
+          </select>
+        </div>
+        <p className="field-hint" id="frame-hint">
+          {frameKind === "rotating"
+            ? "The line joining the pair is held fixed. This is what makes Lagrange points and Trojan clouds stand still instead of blurring."
+            : frameKind === "barycentric"
+              ? "Origin at the system centre of mass."
+              : frameKind === "body"
+                ? "Origin at the chosen body."
+                : "Raw simulation coordinates."}
+        </p>
+      </div>
+
+      {(frameKind === "body" || frameKind === "rotating") && (
+        <div className="field">
+          <label htmlFor={`${frameId}-primary`}>
+            {frameKind === "rotating" ? "Primary" : "Centre on"}
+          </label>
+          <div className="select">
+            <select
+              id={`${frameId}-primary`}
+              value={primaryIndex}
+              onChange={(event) => setPrimaryIndex(Number(event.target.value))}
+            >
+              {bodyOptions}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {frameKind === "rotating" && (
+        <div className="field">
+          <label htmlFor={`${frameId}-secondary`}>Secondary</label>
+          <div className="select">
+            <select
+              id={`${frameId}-secondary`}
+              value={secondaryIndex}
+              onChange={(event) => setSecondaryIndex(Number(event.target.value))}
+            >
+              {bodyOptions}
+            </select>
+          </div>
+        </div>
+      )}
+
+      <div className="field">
+        <label htmlFor={scaleId}>Body size</label>
+        <div className="select">
+          <select
+            id={scaleId}
+            value={scaleMode}
+            onChange={(event) => setScaleMode(event.target.value as ScaleMode)}
+            aria-describedby="scale-hint"
+          >
+            <option value="legible">Legible (enlarged to stay visible)</option>
+            <option value="true">True scale</option>
+          </select>
+        </div>
+        <p className="field-hint" id="scale-hint">
+          {scaleMode === "legible"
+            ? "Bodies below a few pixels are drawn larger so they stay visible. Display only — the physics uses the true radius."
+            : "True physical radii. At solar-system scale most bodies become smaller than one pixel."}
+        </p>
+      </div>
+
+      <div className="field">
+        <span className="field-label">Show</span>
+        <div className="toggle-row">
+          <button
+            type="button"
+            className="btn"
+            aria-pressed={showTrails}
+            onClick={() => setShowTrails((v) => !v)}
+          >
+            Trails
+          </button>
+          <button
+            type="button"
+            className="btn"
+            aria-pressed={showLabels}
+            onClick={() => setShowLabels((v) => !v)}
+          >
+            Labels
+          </button>
+          <button
+            type="button"
+            className="btn"
+            aria-pressed={showBarycentre}
+            onClick={() => setShowBarycentre((v) => !v)}
+          >
+            Barycentre
+          </button>
+          <button
+            type="button"
+            className="btn"
+            aria-pressed={showGrid}
+            onClick={() => setShowGrid((v) => !v)}
+          >
+            Grid
+          </button>
+        </div>
+      </div>
+
+      <div className="field">
+        <span className="field-label">Camera</span>
+        <div className="toggle-row">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              sceneRef.current?.fitAll();
+              setAnnounce("View fitted to all bodies.");
+            }}
+          >
+            Fit all
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              sceneRef.current?.recentreCamera();
+              setFocusIndex(null);
+              setAnnounce("Camera recentred.");
+            }}
+          >
+            Recentre
+          </button>
+        </div>
+        <p className="field-hint">
+          {focusIndex !== null && bodies[focusIndex]
+            ? `Following ${bodies[focusIndex].name}. Select it again in the Bodies tab to stop.`
+            : "Select a body in the Bodies tab to follow it."}
+        </p>
+      </div>
     </>
   );
 
@@ -444,185 +1019,223 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     </dl>
   );
 
-  const helpPanel = (
-    <table className="diagnostics">
-      <caption className="visually-hidden">Keyboard shortcuts</caption>
-      <thead>
-        <tr>
-          <th scope="col">Key</th>
-          <th scope="col">Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th scope="row">Space or K</th>
-          <td>Play or pause</td>
-        </tr>
-        <tr>
-          <th scope="row">R</th>
-          <td>Reset</td>
-        </tr>
-        <tr>
-          <th scope="row">.</th>
-          <td>Advance one step</td>
-        </tr>
-        <tr>
-          <th scope="row">Arrow keys</th>
-          <td>Orbit the camera</td>
-        </tr>
-        <tr>
-          <th scope="row">+ and −</th>
-          <td>Zoom in and out</td>
-        </tr>
-      </tbody>
-    </table>
+  const sharePanel = (
+    <>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-2)" }}>
+        <button type="button" className="btn" onClick={handleSave}>
+          Save locally
+        </button>
+        <button type="button" className="btn" onClick={handleExport}>
+          Export JSON
+        </button>
+        <button type="button" className="btn" onClick={() => void handleShare()}>
+          Share link
+        </button>
+        <button type="button" className="btn" onClick={handleExportImage}>
+          Save image
+        </button>
+      </div>
+      {saveState && <p className="field-hint">{saveState}</p>}
+      {shareUrl && (
+        <div className="field" style={{ marginTop: "var(--s-3)" }}>
+          <label htmlFor="share-url">Shareable link</label>
+          <input id="share-url" type="text" readOnly value={shareUrl} />
+          <p className="field-hint">
+            The scenario travels in the link’s fragment, so it is never sent to a
+            server.
+          </p>
+        </div>
+      )}
+    </>
   );
 
   return (
-    <div>
-      <p>
+    <div className="sim" data-panel={panelOpen ? "open" : "closed"}>
+      <canvas
+        ref={canvasRef}
+        className="sim__canvas"
+        role="img"
+        aria-label={`3D view of ${scenario.name}, showing ${bodies.length} bodies. A readable table of the same data is in the Bodies panel.`}
+      />
+
+      <div className="sim__labels" ref={labelsRef} />
+
+      <div className="sim__head">
         <button type="button" className="btn btn--ghost" onClick={onBack}>
-          ← All scenarios
+          ← Scenarios
         </button>
-      </p>
-
-      <h1>{scenario.name}</h1>
-      <p>{scenario.summary}</p>
-
-      {error && (
-        <div className="notice notice--error" role="alert">
-          {error}
+        <div className="sim__title">
+          <h1>{scenario.name}</h1>
+          <p>{scenario.summary}</p>
         </div>
-      )}
-      {timestepWarning && (
-        <div className="notice notice--warn" role="status">
-          {timestepWarning}
-        </div>
-      )}
-
-      <div className="sim-layout">
-        <section className="viewport" aria-label="Simulation view">
-          {/*
-            The canvas is announced as an image with a description. The
-            authoritative, readable version of this data is the Bodies table in
-            the panel alongside, which is referenced here so a screen-reader
-            user is pointed at it rather than left with nothing.
-          */}
-          <canvas
-            ref={canvasRef}
-            role="img"
-            aria-label={`3D view of ${scenario.name}, showing ${bodies.length} bodies. A readable table of the same data is available in the Bodies panel.`}
-          />
-
-          <div className="transport">
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={togglePlay}
-              aria-pressed={playing}
-            >
-              {playing ? "Pause" : "Play"}
-            </button>
-            <button type="button" className="btn" onClick={handleStep}>
-              Step
-            </button>
-            <button type="button" className="btn" onClick={handleReset}>
-              Reset
-            </button>
-
-            <div className="field" style={{ margin: 0 }}>
-              <label htmlFor={speedId}>Speed</label>
-              <select
-                id={speedId}
-                value={speed}
-                onChange={(event) => handleSpeed(Number(event.target.value))}
-              >
-                {SPEEDS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="button"
-              className="btn"
-              aria-pressed={showTrails}
-              onClick={() => setShowTrails((v) => !v)}
-            >
-              Trails
-            </button>
-          </div>
-        </section>
-
-        <div>
-          <section className="panel" aria-labelledby="integrator-heading">
-            <h2 id="integrator-heading">Integrator</h2>
-            <div className="field">
-              <label htmlFor={integratorId}>Method</label>
-              <select
-                id={integratorId}
-                value={integrator}
-                onChange={(event) =>
-                  handleIntegrator(event.target.value as IntegratorName)
-                }
-                aria-describedby="integrator-guidance"
-              >
-                {INTEGRATOR_INFO.map((info) => (
-                  <option key={info.name} value={info.name}>
-                    {info.label} — order {info.order}
-                    {info.symplectic ? ", symplectic" : ""}
-                  </option>
-                ))}
-              </select>
-              <p className="field-hint" id="integrator-guidance">
-                {integratorInfo?.guidance}
-              </p>
-            </div>
-          </section>
-
-          <section className="panel" aria-label="Simulation details">
-            <Tabs
-              label="Simulation details"
-              activeId={activeTab}
-              onChange={setActiveTab}
-              tabs={[
-                { id: "bodies", label: "Bodies", content: bodiesPanel },
-                { id: "diagnostics", label: "Diagnostics", content: diagnosticsPanel },
-                { id: "source", label: "Source", content: sourcePanel },
-                { id: "keys", label: "Keys", content: helpPanel },
-              ]}
-            />
-          </section>
-
-          <section className="panel" aria-labelledby="actions-heading">
-            <h2 id="actions-heading">Save and share</h2>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-              <button type="button" className="btn" onClick={handleSave}>
-                Save locally
-              </button>
-              <button type="button" className="btn" onClick={handleExport}>
-                Export JSON
-              </button>
-              <button type="button" className="btn" onClick={() => void handleShare()}>
-                Share link
-              </button>
-            </div>
-            {saveState && <p className="field-hint">{saveState}</p>}
-            {shareUrl && (
-              <div className="field" style={{ marginTop: "0.75rem" }}>
-                <label htmlFor="share-url">Shareable link</label>
-                <input id="share-url" type="text" readOnly value={shareUrl} />
-                <p className="field-hint">
-                  The scenario travels in the link’s fragment, so it is never sent to a
-                  server.
-                </p>
-              </div>
-            )}
-          </section>
+        <div className="sim__tools" role="group" aria-label="View controls">
+          <button
+            type="button"
+            className="btn btn--icon"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Keyboard shortcuts"
+          >
+            ?
+          </button>
+          <button
+            type="button"
+            className="btn btn--icon"
+            onClick={() => setPanelOpen((v) => !v)}
+            aria-expanded={panelOpen}
+            aria-controls={panelId}
+            aria-label={panelOpen ? "Hide details panel" : "Show details panel"}
+          >
+            {panelOpen ? "▸" : "◂"}
+          </button>
         </div>
       </div>
+
+      <div className="sim__warnings">
+        {error && (
+          <div className="notice notice--error" role="alert">
+            {error}
+          </div>
+        )}
+        {timestepWarning && (
+          <div className="notice notice--warn" role="status">
+            {timestepWarning}
+          </div>
+        )}
+      </div>
+
+      <div className="sim__transport" role="group" aria-label="Playback controls">
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={togglePlay}
+          aria-pressed={playing}
+        >
+          {playing ? "Pause" : "Play"}
+        </button>
+        <button type="button" className="btn" onClick={handleStep}>
+          Step
+        </button>
+        <button type="button" className="btn" onClick={handleReset}>
+          Reset
+        </button>
+
+        <div className="select">
+          <label htmlFor={speedId} className="visually-hidden">
+            Speed
+          </label>
+          <select
+            id={speedId}
+            value={speed}
+            onChange={(event) => handleSpeed(Number(event.target.value))}
+          >
+            {SPEEDS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <span className="sim__clock" aria-live="off">
+          {hud ? formatDuration(hud.simTimeDays) : "—"}
+        </span>
+      </div>
+
+      <aside
+        className="sim__panel"
+        id={panelId}
+        hidden={!panelOpen}
+        aria-label="Simulation details"
+      >
+        <div className="sim__panel-head">
+          <span className="field-label">Details</span>
+          <button
+            type="button"
+            className="btn btn--ghost btn--icon"
+            onClick={() => setPanelOpen(false)}
+            aria-label="Hide details panel"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="sim__panel-body">
+          <Tabs
+            label="Simulation details"
+            activeId={activeTab}
+            onChange={setActiveTab}
+            tabs={[
+              { id: "bodies", label: "Bodies", content: bodiesPanel },
+              { id: "diagnostics", label: "Diagnostics", content: diagnosticsPanel },
+              { id: "settings", label: "View", content: settingsPanel },
+              { id: "source", label: "Source", content: sourcePanel },
+              { id: "share", label: "Share", content: sharePanel },
+            ]}
+          />
+        </div>
+      </aside>
+
+      <Dialog
+        open={helpOpen}
+        title="Keyboard and pointer"
+        onClose={() => setHelpOpen(false)}
+      >
+        <table className="diagnostics">
+          <tbody>
+            <tr>
+              <th scope="row">
+                <kbd>Space</kbd> / <kbd>K</kbd>
+              </th>
+              <td>Play or pause</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                <kbd>R</kbd>
+              </th>
+              <td>Reset to starting conditions</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                <kbd>.</kbd>
+              </th>
+              <td>Advance one step</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                <kbd>C</kbd>
+              </th>
+              <td>Recentre the camera</td>
+            </tr>
+            <tr>
+              <th scope="row">Arrow keys</th>
+              <td>Orbit the camera</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                <kbd>+</kbd> / <kbd>−</kbd>
+              </th>
+              <td>Zoom in and out</td>
+            </tr>
+            <tr>
+              <th scope="row">
+                <kbd>?</kbd>
+              </th>
+              <td>Open this dialog</td>
+            </tr>
+            <tr>
+              <th scope="row">Drag</th>
+              <td>Orbit · one finger on touch</td>
+            </tr>
+            <tr>
+              <th scope="row">Shift + drag</th>
+              <td>Pan · two fingers on touch</td>
+            </tr>
+            <tr>
+              <th scope="row">Wheel / pinch</th>
+              <td>Zoom</td>
+            </tr>
+          </tbody>
+        </table>
+      </Dialog>
 
       <LiveRegion message={announcement} />
     </div>

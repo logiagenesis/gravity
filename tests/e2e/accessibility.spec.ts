@@ -106,7 +106,7 @@ test.describe("keyboard-only operation", () => {
     );
 
     await page.keyboard.press("End");
-    await expect(page.getByRole("tab", { name: "Keys" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "Share" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

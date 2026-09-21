@@ -80,7 +80,10 @@ export class SimState {
     this.flags[i] = FLAG_ACTIVE | (massless ? FLAG_MASSLESS : 0);
     this.ids[i] = body.id;
     this.names[i] = body.name;
-    this.colours[i] = body.colour ?? "#ffffff";
+    // Empty means "the scenario did not say", which is different from white.
+    // The renderer decides what an unspecified body should look like, because
+    // that depends on whether it is a star (src/render/scene.ts).
+    this.colours[i] = body.colour ?? "";
     return i;
   }
 

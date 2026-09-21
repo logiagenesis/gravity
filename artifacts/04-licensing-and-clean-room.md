@@ -235,3 +235,119 @@ there is none.
 **Verified now:** the upstream clone is at
 `/home/user/thehappykoala/harmony-of-the-spheres`, entirely outside
 `/home/user/gravity`. No file has been copied between them.
+
+---
+
+## 11. Third-party data sources — checked before use
+
+Rule 3 of the remediation brief: every third-party asset or dataset gets a row
+here with source URL, licence/terms and the date checked **before** it is
+committed. This section is maintained as sources are added.
+
+### NASA Exoplanet Archive — Planetary Systems Composite Parameters (`pscomppars`)
+
+| Field                        | Value                                                                                                                                                                                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source URL**               | https://exoplanetarchive.ipac.caltech.edu/TAP/sync (TAP service, table `pscomppars`)                                                                                                                                                    |
+| **Operator**                 | California Institute of Technology, under contract with NASA, Exoplanet Exploration Program                                                                                                                                             |
+| **Terms**                    | Freely available to the community. The archive _requests_ citation and acknowledgement rather than imposing a restrictive licence                                                                                                       |
+| **Date checked**             | 21/09/2026                                                                                                                                                                                                                              |
+| **Required acknowledgement** | "This research has made use of the NASA Exoplanet Archive, which is operated by the California Institute of Technology, under contract with the National Aeronautics and Space Administration under the Exoplanet Exploration Program." |
+| **Requested citation**       | Christiansen et al. (2025), the archive's overview paper                                                                                                                                                                                |
+| **What we ingest**           | Numerical parameters only: planet and host names, orbital period, semi-major axis, eccentricity, planet mass and radius, stellar mass/radius/effective temperature. **No prose, no images.**                                            |
+| **Rows available**           | 6,322 planets with a usable orbit (published period **or** semi-major axis) plus M★ and Mp, as of the retrieval date. Verified against the archive's own count query                                                                    |
+| **Verdict**                  | ✅ **Usable.** Facts are not copyrightable, the archive explicitly invites reuse, and the acknowledgement is discharged per scenario in the mandatory `source` block plus a site-wide credit                                            |
+
+**How the acknowledgement is discharged.** Every generated scenario carries the
+acknowledgement text in `source.notes` and the archive in `source.provider`, so
+the credit travels with the data rather than living only in a footer a user may
+never see. The site-wide credit additionally appears on the About page.
+
+**Access note.** This session's egress proxy blocks
+`exoplanetarchive.ipac.caltech.edu` directly, and CI has no access to it either.
+The pipeline therefore reads a **committed CSV snapshot** rather than querying
+at build time — which is also what makes builds reproducible and offline-safe.
+The snapshot records the exact ADQL query and retrieval date so it can be
+regenerated and audited: see `data/sources/snapshots/README.md`.
+
+**Data-quality note, found by our own checks.** `pscomppars` is a _composite_
+table — each parameter is taken from whichever reference the archive judges
+best — so `pl_orbsmax` and `pl_orbper` can come from different papers, or from
+the same paper and still disagree. Measured over the 5,570 planets that carry
+both, the period implied by the published semi-major axis differs from the
+published period by more than 10% for 210 of them and by more than 25% for 43.
+Spot checks show why: `KOI-2513.01` carries a semi-major axis of exactly
+0.5 AU against a period of 19.005 days, and `TOI-2285 b` pairs a 2022 axis with
+a 2025 period. Because the period is the measured quantity for transit and
+radial-velocity detections, the pipeline sizes every orbit from it and falls
+back to the axis only where no period is published (335 of 6,322 planets).
+This is recorded in each affected scenario's own citation block and checked in
+CI.
+
+### NASA JPL Solar System Dynamics / NSSDCA Planetary Fact Sheet
+
+Already in use for the hand-built solar-system scenarios; recorded here for
+completeness.
+
+| Field              | Value                                                                                                    |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Source URL**     | https://ssd.jpl.nasa.gov/planets/approx_pos.html · https://nssdc.gsfc.nasa.gov/planetary/factsheet/      |
+| **Operator**       | NASA JPL / NASA Goddard (NSSDCA)                                                                         |
+| **Terms**          | US-government-funded public data; NASA generally permits reuse of unrestricted material with attribution |
+| **Date checked**   | 21/09/2026                                                                                               |
+| **What we ingest** | Numerical parameters only (masses, radii, semi-major axes, eccentricities)                               |
+| **Verdict**        | ✅ Usable with attribution, which every scenario carries                                                 |
+
+### NASA JPL Horizons on-line ephemeris system (API)
+
+| Field                       | Value                                                                                                                                                                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source URL**              | https://ssd.jpl.nasa.gov/api/horizons.api (documented at https://ssd-api.jpl.nasa.gov/doc/horizons.html)                                                                                                                    |
+| **Operator**                | Solar System Dynamics Group, Jet Propulsion Laboratory / Caltech, under contract with NASA                                                                                                                                  |
+| **Terms**                   | JPL Image Use Policy, checked 21/09/2026: material on public `jpl.nasa.gov` sites "may be used for any purpose without prior permission", subject to a credit line and to not claiming or implying endorsement              |
+| **Required credit**         | "Courtesy NASA/JPL-Caltech"                                                                                                                                                                                                 |
+| **Restrictions that apply** | No claim or implication of NASA/JPL/Caltech endorsement. The NASA insignia, logotype and seal need prior written approval and are **not used**. The identifiable-person and third-party-copyright cases concern images only |
+| **Date checked**            | 21/09/2026                                                                                                                                                                                                                  |
+| **What we ingest**          | Numerical state vectors only (position and velocity, AU and AU/day, ecliptic J2000, solar-system barycentre), at one recorded epoch. **No prose, no images, no logos.**                                                     |
+| **Ephemeris source**        | DE441, as reported by Horizons in each response header and recorded in the snapshot                                                                                                                                         |
+| **Verdict**                 | ✅ **Usable.** Numerical facts are not copyrightable, and the policy permits use with credit. The credit is carried in each generated scenario's `source` block, so it travels with the data                                |
+
+**Access note.** Unlike the Exoplanet Archive, Horizons is reachable from this
+session through the Firecrawl MCP tool. It is still read into a **committed
+snapshot** rather than queried at build time: CI has no outbound access, a
+build that depends on a live third-party service is a build that breaks when
+that service does, and an ephemeris is only meaningful with its epoch pinned.
+
+### DEBCat — catalogue of well-studied detached eclipsing binaries
+
+| Field                  | Value                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source URL**         | https://www.astro.keele.ac.uk/jkt/debcat/ · machine-readable table https://www.astro.keele.ac.uk/jkt/debcat/debs.dat                                                                                                                                                                                                                                                         |
+| **Compiler**           | John Southworth, Keele University. Originally based on Andersen (1991, A&ARv 3, 91) and updated as new results are published                                                                                                                                                                                                                                                 |
+| **Terms**              | The page states, verbatim: _"Please cite this paper if you use DEBCat in your work."_ A citation request, not a restrictive licence. No copyright notice or conditions of use are asserted                                                                                                                                                                                   |
+| **Date checked**       | 21/09/2026                                                                                                                                                                                                                                                                                                                                                                   |
+| **Requested citation** | Southworth (2015), _DEBCat: A Catalog of Detached Eclipsing Binary Stars_, ASP Conference Series 496, 164 ([2015ASPC..496..164S](http://adsabs.harvard.edu/abs/2015ASPC..496..164S), arXiv:1411.1219)                                                                                                                                                                        |
+| **What we ingest**     | Numerical measurements only: orbital period, and per component log mass, log radius and log effective temperature. **No prose, no images, no plots.** Each system's own literature references stay with it                                                                                                                                                                   |
+| **Rows**               | 388 systems as of the retrieval date                                                                                                                                                                                                                                                                                                                                         |
+| **Why this source**    | It publishes BOTH component masses as measurements. The alternative considered, MORBBINCAT (Malkov et al. 2012), gives only the _total_ dynamical mass, so splitting it would have required a mass–luminosity or spectral-type model for every system — an assumption at the heart of every scenario, which this project does not accept where a measured alternative exists |
+| **Verdict**            | ✅ **Usable.** Physical measurements are facts, the compiler invites use, and the citation is discharged in every generated scenario's `source` block plus the About page                                                                                                                                                                                                    |
+
+### Prior-art screenshot held for comparison
+
+| Field              | Value                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **File**           | `artifacts/screenshots/prior-art/gravitysimulator-org-exoplanets-1440x900.png`                                                                               |
+| **Source URL**     | https://gravitysimulator.org/exoplanets                                                                                                                      |
+| **Captured**       | 21/09/2026, at 1440×900, via the Firecrawl MCP tool                                                                                                          |
+| **Why it is here** | Rule 5 of the remediation brief requires the equivalent view on the original to be captured and committed alongside ours for each of M3, M4 and M5           |
+| **How it is used** | Comparison and critique only, inside `artifacts/`. It is **not** used in the product, **not** served by it, and no part of it is reproduced in any asset     |
+| **Clean-room**     | Unaffected. Looking at a competitor's page to assess it is not copying it. No code, asset, scenario file, shader or text from that site enters this codebase |
+| **Verdict**        | ✅ Held as evidence in a private repository for the owner's own comparison, which is what the owner asked for                                                |
+
+### Sources considered and NOT used
+
+| Source                                        | Why not                                                                                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| ~~JPL Horizons spacecraft ephemerides~~       | **Now evaluated and used** — see the Horizons row above. Moved out of this table                                                |
+| Planetary surface textures (NASA/JPL imagery) | Not needed: M3 renders procedural surfaces in-shader, which avoids the download cost and the per-image licensing check entirely |
+| Any Harmony of the Spheres scenario JSON      | Clean-room rule. Their files are not ours to copy, and the same primary sources are directly available                          |

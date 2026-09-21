@@ -24,7 +24,12 @@ test("measure baseline", async ({ page, browserName }) => {
   for (const scenario of SCENARIOS) {
     await page.goto(`/#/scenario/${scenario.id}`);
     await page.getByRole("img", { name: /3D view of/ }).waitFor();
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    // The details panel is closed by default at phone width.
+    const diagnostics = page.getByRole("tab", { name: "Diagnostics" });
+    if (!(await diagnostics.isVisible())) {
+      await page.getByRole("button", { name: /Show details panel/ }).click();
+    }
+    await diagnostics.click();
     await page.getByRole("button", { name: "Play" }).click();
 
     // Let it reach steady state before sampling.

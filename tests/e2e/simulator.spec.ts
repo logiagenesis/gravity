@@ -1,4 +1,22 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+
+/**
+ * Open a panel tab. The simulator now presents its controls in an overlay
+ * panel rather than inline, so tests must open the relevant tab first. The
+ * panel is open by default at desktop width.
+ */
+async function openTab(page: Page, name: string) {
+  const tab = page.getByRole("tab", { name });
+  if (!(await tab.isVisible())) {
+    await page.getByRole("button", { name: /Show details panel/ }).click();
+  }
+  // Wait for the tab rather than clicking whatever is there: the panel can be
+  // mid-transition, and under a loaded suite that raced and timed out.
+  await expect(tab).toBeVisible();
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/#/scenario/sun-and-earth");
@@ -30,7 +48,7 @@ test.describe("simulator", () => {
   });
 
   test("advances simulated time while playing", async ({ page }) => {
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    await openTab(page, "Diagnostics");
     await page.getByRole("button", { name: "Play" }).click();
 
     // Simulated time must become non-zero.
@@ -58,7 +76,8 @@ test.describe("simulator", () => {
   });
 
   test("switches integrator and shows its guidance", async ({ page }) => {
-    const picker = page.getByLabel("Method");
+    await openTab(page, "View");
+    const picker = page.getByLabel("Integrator");
     await picker.selectOption("rk4");
     await expect(picker).toHaveValue("rk4");
     // The trade-off must be stated, not hidden.
@@ -69,7 +88,7 @@ test.describe("simulator", () => {
   });
 
   test("steps once while paused", async ({ page }) => {
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    await openTab(page, "Diagnostics");
     await page.getByRole("button", { name: "Step" }).click();
     await expect
       .poll(async () => {
@@ -80,7 +99,7 @@ test.describe("simulator", () => {
   });
 
   test("resets back to the start", async ({ page }) => {
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    await openTab(page, "Diagnostics");
     await page.getByRole("button", { name: "Play" }).click();
     await page.waitForTimeout(600);
     await page.getByRole("button", { name: "Reset" }).click();
@@ -94,7 +113,7 @@ test.describe("simulator", () => {
   });
 
   test("shows conservation diagnostics", async ({ page }) => {
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    await openTab(page, "Diagnostics");
     await expect(page.getByRole("row", { name: /Energy drift/ })).toBeVisible();
     await expect(
       page.getByRole("row", { name: /Angular momentum drift/ }),
@@ -103,7 +122,7 @@ test.describe("simulator", () => {
   });
 
   test("shows the data source citation", async ({ page }) => {
-    await page.getByRole("tab", { name: "Source" }).click();
+    await openTab(page, "Source");
     await expect(page.getByText("NASA NSSDCA Planetary Fact Sheet")).toBeVisible();
     await expect(page.getByText(/Idealised coplanar model/)).toBeVisible();
   });
@@ -111,6 +130,7 @@ test.describe("simulator", () => {
   test("creates a share link that carries the scenario in the fragment", async ({
     page,
   }) => {
+    await openTab(page, "Share");
     await page.getByRole("button", { name: "Share link" }).click();
     const input = page.getByLabel("Shareable link");
     await expect(input).toBeVisible();
@@ -121,6 +141,7 @@ test.describe("simulator", () => {
   });
 
   test("a share link round-trips into a working simulation", async ({ page }) => {
+    await openTab(page, "Share");
     await page.getByRole("button", { name: "Share link" }).click();
     const shareUrl = await page.getByLabel("Shareable link").inputValue();
 
@@ -140,12 +161,120 @@ test.describe("simulator", () => {
   });
 
   test("saves a scenario locally and lists it", async ({ page }) => {
+    await openTab(page, "Share");
     await page.getByRole("button", { name: "Save locally" }).click();
     await expect(page.getByText("Saved to this browser.")).toBeVisible();
 
     await page.goto("/#/saved");
     await expect(
       page.getByRole("heading", { name: "The Sun and the Earth" }),
+    ).toBeVisible();
+  });
+
+  test("a scenario's own camera target is honoured on load", async ({ page }) => {
+    // `camera.target` was in the schema and validated against the body ids
+    // from the start, but nothing read it, so every scenario opened framed on
+    // the origin. "Webb at L2" made that obvious: it opened looking at the Sun
+    // from 0.05 AU away.
+    await page.goto("/#/scenario/jwst-at-l2");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Webb");
+    await openTab(page, "Bodies");
+    await expect(
+      page.getByRole("button", { name: "Earth", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    // And nothing else is being followed.
+    await expect(
+      page.getByRole("button", { name: "Sun", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("a scenario without a camera target follows nothing", async ({ page }) => {
+    await page.goto("/#/scenario/figure-eight-choreography");
+    // beforeEach loaded a different scenario, so wait for this one to arrive
+    // before touching the panel.
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Figure-Eight");
+    await openTab(page, "Bodies");
+    await expect(
+      page.getByRole("button", { name: "Body A", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("switches the contact mode and states which law it obeys", async ({ page }) => {
+    await openTab(page, "View");
+    const picker = page.getByLabel("On contact");
+    await expect(picker).toHaveValue("merge");
+    await expect(page.getByText(/Kinetic energy DROPS/)).toBeVisible();
+
+    await picker.selectOption("elastic");
+    await expect(
+      page.getByText(/Momentum and kinetic energy are both conserved/),
+    ).toBeVisible();
+
+    await picker.selectOption("pass-through");
+    await expect(page.getByText(/bodies fall through each other/)).toBeVisible();
+  });
+
+  test("warns when the timestep cannot resolve the fastest orbit", async ({ page }) => {
+    // A simulator that quietly returns a smooth, wrong answer is worse than
+    // one that says it is struggling.
+    await openTab(page, "View");
+    const timestep = page.getByLabel(/Timestep/);
+    await timestep.fill("400");
+    await timestep.blur();
+
+    await openTab(page, "Diagnostics");
+    const warnings = page.getByRole("list", {
+      name: "Warnings about this simulation",
+    });
+    await expect(warnings.getByText(/steps per orbit/).first()).toBeVisible();
+    // And it says what to DO, not only that something is wrong.
+    await expect(warnings.getByText(/Reduce the timestep/)).toBeVisible();
+  });
+
+  test("shows no warnings on a healthy run", async ({ page }) => {
+    await openTab(page, "Diagnostics");
+    await expect(
+      page.getByRole("list", { name: "Warnings about this simulation" }),
+    ).toHaveCount(0);
+  });
+
+  test("saves the view as a PNG captioned with its citation", async ({ page }) => {
+    // An image of a simulation shared without saying where its data came from
+    // is exactly the unsourced claim this project exists not to make, so the
+    // citation is composited into the file rather than left to the sharer.
+    await openTab(page, "Share");
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Save image" }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toBe("sun-and-earth.png");
+
+    const path = await file.path();
+    const bytes = await readFile(path);
+    // A real PNG, not an empty or truncated one. The WebGL context has no
+    // preserveDrawingBuffer, so a naive capture would produce a blank image.
+    expect(bytes.subarray(0, 8)).toEqual(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+    expect(bytes.byteLength).toBeGreaterThan(5000);
+  });
+
+  test("charts the conservation errors over time", async ({ page }) => {
+    await openTab(page, "Diagnostics");
+    // Before anything has run there is nothing to plot, and it says so rather
+    // than drawing an empty box.
+    await expect(
+      page.getByText("Press play to start recording.").first(),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Play" }).click();
+    const chart = page.getByRole("img", { name: /Relative energy error over time/ });
+    await expect(chart).toBeVisible({ timeout: 10_000 });
+    // The label carries the current value, so the chart is readable without
+    // being able to see the shape.
+    await expect(chart).toHaveAttribute("aria-label", /Currently \d/);
+
+    await expect(
+      page.getByRole("img", { name: /Relative angular momentum error over time/ }),
     ).toBeVisible();
   });
 });

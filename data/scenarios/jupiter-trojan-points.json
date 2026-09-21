@@ -1,17 +1,18 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "jupiter-trojan-points",
   "name": "Jupiter's Trojan Points",
   "summary": "Massless test particles placed 60 degrees ahead of and behind Jupiter, at the L4 and L5 Lagrange points. Real asteroid families sit here, held in place by the combined pull of the Sun and Jupiter.",
   "category": "what-if",
   "tags": ["lagrange", "trojan", "jupiter", "test-particles", "stability"],
   "difficulty": "advanced",
+  "featured": true,
   "source": {
     "provider": "NASA NSSDCA Planetary Fact Sheet; NASA JPL Solar System Dynamics",
     "reference": "Jupiter mass and radius; Jupiter semi-major axis",
     "retrievedAt": "2026-09-21",
     "url": "https://ssd.jpl.nasa.gov/planets/approx_pos.html",
-    "notes": "Jupiter is placed on a CIRCULAR orbit (its real eccentricity of 0.048 is set to zero) so that L4 and L5 are exactly the equilateral points of the restricted circular three-body problem. The trojans are massless test particles: they feel gravity but exert none."
+    "notes": "Jupiter is placed on a CIRCULAR orbit (its real eccentricity of 0.048 is set to zero) so that L4 and L5 are exactly the equilateral points of the restricted circular three-body problem. The Sun and Jupiter both circle their common barycentre, so the system has no net momentum and does not drift. The trojans are massless test particles: they feel gravity but exert none."
   },
   "physics": {
     "softening": 0,
@@ -19,7 +20,7 @@
     "dt": 1,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": false
+    "collisionMode": "pass-through"
   },
   "bodies": [
     {
@@ -27,16 +28,8 @@
       "name": "Sun",
       "mass": 1,
       "radius": 0.004650467260962158,
-      "position": {
-        "x": 0,
-        "y": 0,
-        "z": 0
-      },
-      "velocity": {
-        "x": 0,
-        "y": 0,
-        "z": 0
-      },
+      "position": { "x": -0.004961359248753264, "y": 0, "z": 0 },
+      "velocity": { "x": 0, "y": -0.000007194865699962621, "z": 0 },
       "colour": "#ffd27f"
     },
     {
@@ -44,16 +37,8 @@
       "name": "Jupiter",
       "mass": 0.0009544883077696756,
       "radius": 0.00047789450254521576,
-      "position": {
-        "x": 5.202887,
-        "y": 0,
-        "z": 0
-      },
-      "velocity": {
-        "x": 0,
-        "y": 0.007545124499196102,
-        "z": 0
-      },
+      "position": { "x": 5.197925640751246, "y": 0, "z": 0 },
+      "velocity": { "x": 0, "y": 0.00753792963349614, "z": 0 },
       "colour": "#d8ca9d"
     },
     {
@@ -61,14 +46,10 @@
       "name": "L4 (Greeks)",
       "mass": 0,
       "radius": 0.06,
-      "position": {
-        "x": 2.6014435000000002,
-        "y": 4.505832315019806,
-        "z": 0
-      },
+      "position": { "x": 2.5964821407512466, "y": 4.505832315019806, "z": 0 },
       "velocity": {
         "x": -0.006534269491020164,
-        "y": 0.003772562249598052,
+        "y": 0.0037653673838980886,
         "z": 0
       },
       "massless": true,
@@ -79,22 +60,15 @@
       "name": "L5 (Trojans)",
       "mass": 0,
       "radius": 0.06,
-      "position": {
-        "x": 2.6014435000000002,
-        "y": -4.505832315019806,
-        "z": 0
-      },
+      "position": { "x": 2.5964821407512466, "y": -4.505832315019806, "z": 0 },
       "velocity": {
         "x": 0.006534269491020164,
-        "y": 0.003772562249598052,
+        "y": 0.0037653673838980886,
         "z": 0
       },
       "massless": true,
       "colour": "#79c0ff"
     }
   ],
-  "camera": {
-    "distance": 14,
-    "target": "sun"
-  }
+  "camera": { "distance": 14, "target": "sun" }
 }

@@ -36,7 +36,7 @@ function make() {
     g: 1,
     dt: 1e-4,
     integrator: "verlet",
-    collisionsEnabled: false,
+    collisionMode: "pass-through",
   });
 }
 

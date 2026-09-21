@@ -118,3 +118,57 @@ Recorded rather than left for a user to discover.
   ARIA semantics are verified structurally by axe and by role-based queries,
   which is **not** the same as a real assistive-technology user's experience.
 - Long-duration soak testing (hours) for memory growth.
+
+---
+
+# M2 + M3 visual gate — 21/09/2026
+
+Captured from the production build at 1440×900 and 393×852, and looked at.
+Screenshots: `artifacts/screenshots/m2-*`, `m3-*`.
+
+## What a first-time visitor now sees
+
+**Before (`03-simulator.png`, pre-M2):** a small black rectangle inside a
+scrolling document, containing five untextured dots about three pixels across.
+It read as a prototype, because it was one.
+
+**After (`m3-desktop-simulator.png`):** the canvas fills the viewport. There is
+a star field with visible magnitude and colour variation. The Sun is a glowing
+disc with limb darkening. Planets are shaded spheres with a day/night
+terminator — Jupiter's latitudinal banding is legible at default zoom
+(`m3-desktop-jupiter.png`). Every body carries a screen-space label that avoids
+its neighbours. Controls are overlay panels that collapse.
+
+Honest verdict: it now reads as a product rather than a demo.
+
+## What each fix was, and why
+
+| Problem seen                                            | Fix                                                                                                                                                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Simulator was a box in a document                       | Full-viewport shell; controls are collapsible overlays                                                                                                                    |
+| Mobile transport bar floated mid-screen over the canvas | The sheet used `max-height`, so "above the sheet" was computed against a height it never reached. Given an exact height instead                                           |
+| Mobile transport scrolled horizontally and hid **Play** | Split the information architecture: playback in the transport, view controls in the header strip                                                                          |
+| Panel tabs clipped ("Source", "Share" cut off)          | Widened the panel to 392px, tightened the tab strip, added a mask fade so any residual scroll reads as scrollable rather than broken                                      |
+| Bodies invisible then barely visible at 3.2px           | Raised the apparent-size floor to 4.5px and widened the size spread to 0.8–2.8×, so the Sun renders ~25px and a terrestrial planet ~11px — enough for the shading to read |
+| Star field read as sensor noise                         | Raised density 2,600 → 5,200 and brightened the magnitude curve                                                                                                           |
+| Labels sat on top of large bodies                       | Offset each label by the body's own apparent radius                                                                                                                       |
+
+## Remaining honest criticisms
+
+| Issue                                                                  | Status                                                                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Labels can be overlapped by the details panel (Jupiter reads "Jupite") | Cosmetic. The panel is correctly on top; a future pass could inset the label bounds by the panel width |
+| No orbit ellipses yet                                                  | **M3 addition listed in the gap audit**, not yet built                                                 |
+| No habitable-zone overlay                                              | Same                                                                                                   |
+| Axial tilt and temperature-driven star colour unused                   | Star colour uses a Sun-like default; real temperatures arrive with the M4 pipeline                     |
+| Ring / test-particle systems not renderable in bulk                    | Instanced path exists above 64 bodies but is untested at scale — M4/M7                                 |
+| Only 7 scenarios                                                       | **M4**                                                                                                 |
+
+## Verification alongside the visual gate
+
+`npm run verify` green: 113 unit tests (physics 30, schema 50, worker 18, share
+9, frames 6) and 33 browser tests including axe on four routes.
+
+The rotating-frame transform is covered by a test that asserts the secondary
+body stays stationary to better than 1e-9 over a full orbit, **with an inertial
+control** proving the transform is not a no-op.

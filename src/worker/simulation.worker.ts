@@ -96,6 +96,14 @@ function sendSnapshot(): void {
     angularMomentum: d.angularMomentum,
     angularMomentumDrift: d.angularMomentumDrift,
     baselineResets: simulation.baselineResets,
+    lastSubsteps: simulation.lastSubsteps,
+    peakSubsteps: simulation.peakSubsteps,
+    closestApproachAu: Number.isFinite(simulation.closestApproach)
+      ? simulation.closestApproach
+      : null,
+    shortestPeriodDays: simulation.shortestPeriodDays,
+    softening: simulation.softening,
+    theta: simulation.forceMode === "barnes-hut" ? simulation.theta : null,
     kineticEnergy: d.kineticEnergy,
     potentialEnergy: d.potentialEnergy,
     integrator: simulation.integratorName,
@@ -168,7 +176,7 @@ function loadScenario(input: Scenario): void {
     dt: validated.physics.dt,
     forceMode: validated.physics.forceMode,
     theta: validated.physics.theta,
-    collisionsEnabled: validated.physics.collisions,
+    collisionMode: validated.physics.collisionMode,
   });
 
   topologyVersion++;
@@ -240,8 +248,8 @@ scope.addEventListener("message", (event: MessageEvent<MainToWorker>) => {
         simulation?.setSoftening(message.softening);
         break;
 
-      case "setCollisions":
-        if (simulation !== null) simulation.collisionsEnabled = message.enabled;
+      case "setCollisionMode":
+        if (simulation !== null) simulation.collisionMode = message.mode;
         break;
 
       case "requestSnapshot":

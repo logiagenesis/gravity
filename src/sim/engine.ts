@@ -15,7 +15,12 @@
 import { SimState, type BodyInit } from "./state";
 import { computeAccelerations, type ForceMode, type ForceOptions } from "./forces";
 import { createIntegrator, type Integrator, type IntegratorName } from "./integrators";
-import { resolveCollisions, type CollisionEvent } from "./collisions";
+import { chooseSubsteps, DEFAULT_ETA } from "./adaptive";
+import {
+  resolveCollisions,
+  type CollisionEvent,
+  type CollisionMode,
+} from "./collisions";
 import { computeConservation, relativeDrift, type Conservation } from "./conservation";
 import { G_AU3_PER_MSUN_DAY2 } from "./constants";
 
@@ -58,7 +63,17 @@ export interface SimulationConfig {
   dt?: number;
   forceMode?: ForceMode | "auto";
   theta?: number;
-  collisionsEnabled?: boolean;
+  collisionMode?: CollisionMode;
+  /**
+   * Sub-divide an outer step when a close encounter needs it.
+   *
+   * On by default, because at the shipped timesteps a fixed step reaches a
+   * relative energy error above 1 — a failure, not a drift — the first time
+   * two bodies pass close (artifacts/12-adaptive-integrator-decision.md).
+   */
+  adaptive?: boolean;
+  /** Accuracy parameter for the sub-stepping criterion. Smaller is finer. */
+  eta?: number;
 }
 
 export interface Diagnostics extends Conservation {
@@ -78,7 +93,29 @@ export class Simulation {
   simTime = 0;
   /** Total fixed steps taken. The authoritative clock for replay. */
   stepCount = 0;
-  collisionsEnabled: boolean;
+  collisionMode: CollisionMode;
+  /** Sub-divide an outer step when a close encounter needs it. */
+  adaptive: boolean;
+  /** Accuracy parameter for the sub-stepping criterion. */
+  eta: number;
+  /**
+   * Substeps used by the most recent outer step. 1 means the fixed step was
+   * already fine enough. Surfaced in the HUD so the cost of an encounter is
+   * visible rather than felt only as a frame-rate drop.
+   */
+  lastSubsteps = 1;
+  /** Highest substep count used since the last reset. */
+  peakSubsteps = 1;
+  /**
+   * Closest any two bodies have come since the last reset, AU.
+   *
+   * Taken from the pairwise pass the sub-stepping criterion already makes, so
+   * it costs nothing. Infinity until two bodies have been compared, which is
+   * also the value for a single body.
+   */
+  closestApproach = Infinity;
+  /** Shortest two-body period present, days, or null if nothing is bound. */
+  shortestPeriodDays: number | null = null;
 
   private accumulator = 0;
   private referenceEnergy = 0;
@@ -93,7 +130,9 @@ export class Simulation {
   constructor(config: SimulationConfig) {
     this.state = SimState.fromBodies(config.bodies);
     this.dt = config.dt ?? 0.01;
-    this.collisionsEnabled = config.collisionsEnabled ?? true;
+    this.collisionMode = config.collisionMode ?? "merge";
+    this.adaptive = config.adaptive ?? true;
+    this.eta = config.eta ?? DEFAULT_ETA;
     this.requestedForceMode = config.forceMode ?? "auto";
     this.force = {
       g: config.g ?? G_AU3_PER_MSUN_DAY2,
@@ -117,6 +156,51 @@ export class Simulation {
     const c = computeConservation(this.state, this.force.g, this.force.softening);
     this.referenceEnergy = c.totalEnergy;
     this.referenceAngularMomentum = c.angularMomentum;
+    this.shortestPeriodDays = this.measureShortestPeriod();
+  }
+
+  /**
+   * Shortest two-body period currently in the system, days, or null if
+   * nothing is on a bound orbit.
+   *
+   * Computed at the same moments as the conservation baseline — on load, on
+   * rebaseline, and after a merge — rather than every step or every frame,
+   * because it is O(n^2) and at 5,000 bodies that is 25 million operations
+   * that would buy nothing: the shortest period does not change materially
+   * except when the body set does, and that is exactly when this reruns.
+   */
+  private measureShortestPeriod(): number | null {
+    const { positions, velocities, masses, count } = this.state;
+    if (count < 2) return null;
+    let shortest = Infinity;
+    for (let i = 0; i < count; i++) {
+      for (let j = i + 1; j < count; j++) {
+        const heavier = masses[i] >= masses[j] ? i : j;
+        const lighter = heavier === i ? j : i;
+        const h3 = heavier * 3;
+        const l3 = lighter * 3;
+        const r = Math.hypot(
+          positions[l3] - positions[h3],
+          positions[l3 + 1] - positions[h3 + 1],
+          positions[l3 + 2] - positions[h3 + 2],
+        );
+        if (r === 0) continue;
+        const v2 =
+          (velocities[l3] - velocities[h3]) ** 2 +
+          (velocities[l3 + 1] - velocities[h3 + 1]) ** 2 +
+          (velocities[l3 + 2] - velocities[h3 + 2]) ** 2;
+        const mu = this.force.g * (masses[heavier] + masses[lighter]);
+        if (mu <= 0) continue;
+        const energy = v2 / 2 - mu / r;
+        if (energy >= 0) continue; // unbound: no period
+        const a = -mu / (2 * energy);
+        const period = 2 * Math.PI * Math.sqrt((a * a * a) / mu);
+        if (Number.isFinite(period) && period > 0 && period < shortest) {
+          shortest = period;
+        }
+      }
+    }
+    return Number.isFinite(shortest) ? shortest : null;
   }
 
   get integratorName(): IntegratorName {
@@ -129,6 +213,18 @@ export class Simulation {
 
   get bodyCount(): number {
     return this.state.count;
+  }
+
+  /** Plummer softening length, AU. */
+  get softening(): number {
+    return this.force.softening;
+  }
+
+  /** Barnes-Hut opening angle. Only meaningful when forceMode is barnes-hut. */
+  get theta(): number {
+    // ForceOptions.theta is optional; the engine always supplies one in its
+    // constructor, so this default is a type formality rather than a fallback.
+    return this.force.theta ?? 0.5;
   }
 
   setIntegrator(name: IntegratorName): void {
@@ -167,12 +263,34 @@ export class Simulation {
   stepFixed(n = 1): CollisionEvent[] {
     const events: CollisionEvent[] = [];
     for (let i = 0; i < n; i++) {
-      this.integratorImpl.step(this.state, this.dt, this.force);
+      /*
+       * The outer step is always exactly `this.dt`, so simulated time stays
+       * refresh-rate independent and replay stays deterministic. What changes
+       * is how finely it is cut up, and only while an encounter needs it.
+       */
+      const decision = this.adaptive
+        ? chooseSubsteps(this.state, this.dt, this.eta)
+        : null;
+      const substeps = decision?.substeps ?? 1;
+      if (decision !== null && decision.minSeparation < this.closestApproach) {
+        this.closestApproach = decision.minSeparation;
+      }
+      this.lastSubsteps = substeps;
+      if (substeps > this.peakSubsteps) this.peakSubsteps = substeps;
+
+      if (substeps === 1) {
+        this.integratorImpl.step(this.state, this.dt, this.force);
+      } else {
+        const h = this.dt / substeps;
+        for (let k = 0; k < substeps; k++) {
+          this.integratorImpl.step(this.state, h, this.force);
+        }
+      }
       this.simTime += this.dt;
       this.stepCount++;
 
-      if (this.collisionsEnabled) {
-        const merged = resolveCollisions(this.state);
+      if (this.collisionMode !== "pass-through") {
+        const merged = resolveCollisions(this.state, this.collisionMode);
         if (merged.length > 0) {
           events.push(...merged);
           // Body count changed: the integrator's cached state and the force
@@ -249,8 +367,16 @@ export class Simulation {
     };
   }
 
-  /** Reset the conservation baseline to the current state. */
+  /**
+   * Reset the conservation baseline to the current state.
+   *
+   * The substep peak is cleared with it: both answer "how has it gone since
+   * the last time we started counting", and leaving a stale peak behind would
+   * report an encounter that is no longer part of the measurement.
+   */
   rebaseline(): void {
     this.captureReference();
+    this.peakSubsteps = 1;
+    this.closestApproach = Infinity;
   }
 }

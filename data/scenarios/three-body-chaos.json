@@ -1,11 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "three-body-chaos",
   "name": "Three-Body Chaos",
   "summary": "Three equal masses at rest in a triangle. There is no closed-form solution, and the outcome is exquisitely sensitive to the starting conditions: usually two bodies pair up and the third is flung away.",
   "category": "choreographies",
   "tags": ["three-body", "chaos", "ejection", "sensitive-dependence"],
   "difficulty": "intermediate",
+  "featured": true,
   "source": {
     "provider": "Constructed for this project",
     "reference": "Equal masses at rest on an equilateral triangle, dimensionless units",
@@ -19,7 +20,7 @@
     "dt": 0.0005,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": true
+    "collisionMode": "merge"
   },
   "bodies": [
     {
@@ -27,16 +28,8 @@
       "name": "Mass 1",
       "mass": 1,
       "radius": 0.04,
-      "position": {
-        "x": 1,
-        "y": 0,
-        "z": 0
-      },
-      "velocity": {
-        "x": 0,
-        "y": 0,
-        "z": 0
-      },
+      "position": { "x": 1, "y": 0, "z": 0 },
+      "velocity": { "x": 0, "y": 0, "z": 0 },
       "colour": "#ff9f45"
     },
     {
@@ -44,16 +37,8 @@
       "name": "Mass 2",
       "mass": 1,
       "radius": 0.04,
-      "position": {
-        "x": -0.4999999999999998,
-        "y": 0.8660254037844387,
-        "z": 0
-      },
-      "velocity": {
-        "x": 0,
-        "y": 0,
-        "z": 0
-      },
+      "position": { "x": -0.4999999999999998, "y": 0.8660254037844387, "z": 0 },
+      "velocity": { "x": 0, "y": 0, "z": 0 },
       "colour": "#8ecae6"
     },
     {
@@ -66,15 +51,9 @@
         "y": -0.8660254037844385,
         "z": 0
       },
-      "velocity": {
-        "x": 0,
-        "y": 0,
-        "z": 0
-      },
+      "velocity": { "x": 0, "y": 0, "z": 0 },
       "colour": "#c77dff"
     }
   ],
-  "camera": {
-    "distance": 4
-  }
+  "camera": { "distance": 4 }
 }

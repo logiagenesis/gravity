@@ -49,7 +49,7 @@ describe("shipped scenarios", () => {
           dt: s.physics.dt,
           forceMode: s.physics.forceMode,
           theta: s.physics.theta,
-          collisionsEnabled: s.physics.collisions,
+          collisionMode: s.physics.collisionMode,
         });
 
         sim.stepFixed(2000);
@@ -79,7 +79,7 @@ describe("derived solar-system data is physically correct", () => {
       integrator: "pefrl",
       dt: s.physics.dt / 10,
       forceMode: "direct",
-      collisionsEnabled: false,
+      collisionMode: "pass-through",
     });
 
     // Detect a full revolution by tracking the cumulative swept angle of the
@@ -135,7 +135,7 @@ describe("derived solar-system data is physically correct", () => {
       integrator: "verlet",
       dt: 1,
       forceMode: "direct",
-      collisionsEnabled: false,
+      collisionMode: "pass-through",
     });
 
     // Jupiter is index 1; the trojans are 2 and 3.
