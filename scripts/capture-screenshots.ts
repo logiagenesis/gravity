@@ -103,6 +103,26 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "m5-desktop-level-explore",
+    path: "#/scenario/inner-solar-system",
+    viewport: DESKTOP,
+    prepare: async (page) => {
+      await openTab(page, "View");
+      await page.getByLabel("How much to show").selectOption({ label: "Explore" });
+      await page.waitForTimeout(200);
+    },
+  },
+  {
+    name: "m5-desktop-level-full",
+    path: "#/scenario/inner-solar-system",
+    viewport: DESKTOP,
+    prepare: async (page) => {
+      await openTab(page, "View");
+      await page.getByLabel("How much to show").selectOption({ label: "Full control" });
+      await page.waitForTimeout(200);
+    },
+  },
+  {
     name: "m5-mobile-experiments",
     path: "#/scenario/jupiter-trojan-points",
     viewport: MOBILE,

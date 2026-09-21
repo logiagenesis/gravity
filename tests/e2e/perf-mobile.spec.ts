@@ -7,6 +7,7 @@
  * a very loose sanity floor so this cannot silently become a no-op.
  */
 import { test, expect } from "@playwright/test";
+import { DETAIL_LEVEL_STORAGE_KEY } from "../../src/ui/detail-level";
 
 const SCENARIOS = [
   { id: "sun-and-earth", label: "Sun + Earth", bodies: 2 },
@@ -18,6 +19,21 @@ const SCENARIOS = [
 test("measure baseline", async ({ page, browserName }) => {
   test.setTimeout(180_000);
   const rows: string[] = [];
+
+  // The worker and frame timings are shown at the most detailed level only.
+  // Set it before the app loads rather than clicking through a phone-sized
+  // panel on every scenario.
+  await page.addInitScript(
+    ([key, level]) => {
+      try {
+        localStorage.setItem(key, level);
+      } catch {
+        // A browser that refuses storage will report "—" and the sanity
+        // floor below will catch it, which is the right failure.
+      }
+    },
+    [DETAIL_LEVEL_STORAGE_KEY, "advanced"] as const,
+  );
 
   const ua = await page.evaluate(() => navigator.userAgent).catch(() => "");
 
