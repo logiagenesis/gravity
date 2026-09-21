@@ -55,3 +55,36 @@ curl -sSI https://<host>/ | grep -iE 'content-security|strict-transport|x-conten
 ```
 
 or a public scanner such as securityheaders.com.
+
+## GitHub Pages: what is and is not achievable
+
+GitHub Pages serves no custom response headers. `public/_headers` is honoured by
+Cloudflare Pages and Netlify but is **inert on Pages**, so the primary
+deployment relies on a `<meta http-equiv="Content-Security-Policy">` tag in
+`index.html`.
+
+A meta-delivered CSP is strictly weaker than a header. What carries over, and
+what does not:
+
+| Protection                                                                                                                            | Header deploy | GitHub Pages | Why                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `default-src`, `script-src`, `style-src`, `img-src`, `font-src`, `connect-src`, `worker-src`, `object-src`, `base-uri`, `form-action` | ✅            | ✅ meta      | Supported in meta CSP                                                                                            |
+| `frame-ancestors`                                                                                                                     | ✅            | ❌           | **Ignored in meta CSP by specification.** Clickjacking protection is unavailable on Pages                        |
+| `X-Frame-Options: DENY`                                                                                                               | ✅            | ❌           | Header-only                                                                                                      |
+| `Strict-Transport-Security`                                                                                                           | ✅            | ⚠️ partial   | Header-only for us, but `github.io` is on the HSTS preload list, so browsers enforce HTTPS for the domain anyway |
+| `X-Content-Type-Options: nosniff`                                                                                                     | ✅            | ❌           | Header-only. GitHub Pages does send correct `Content-Type` values                                                |
+| `Referrer-Policy`                                                                                                                     | ✅            | ⚠️ meta      | `<meta name="referrer">` covers this; currently not set                                                          |
+| `Permissions-Policy`                                                                                                                  | ✅            | ❌           | Header-only                                                                                                      |
+
+**Assessment.** For a static site with no authentication, no cookies, no user
+accounts and no third-party requests, the residual risk from the missing
+headers is low. The one genuine loss is `frame-ancestors` / `X-Frame-Options`:
+on GitHub Pages the site **can** be framed by anyone. Since there is nothing to
+clickjack — no credentials, no state-changing authenticated action — this is
+accepted rather than mitigated, and it is recorded here so the decision is
+visible rather than accidental.
+
+This limitation also interacts with the planned embeddable classroom mode: on a
+header-based deploy, framing is forbidden and embedding would need a deliberate
+exception; on Pages it is already possible. That decision is deferred to the
+milestone that implements embedding.
