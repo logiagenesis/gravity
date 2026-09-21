@@ -23,6 +23,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The catalogue manifest and search index are generated build artefacts
+      # (gitignored) that the app's TypeScript imports. They must exist before
+      # typecheck runs, or tsc cannot resolve them. CI caught exactly this.
+      - name: Generate catalogue
+        run: npm run data:build
+
       - name: Format check
         run: npm run format:check
 

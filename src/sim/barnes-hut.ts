@@ -126,6 +126,12 @@ function allocNode(p: Pool): number {
 /**
  * Build an octree over the massive bodies of `state`.
  * Returns null when there is no mass to build from.
+ *
+ * IMPORTANT: the returned tree is backed by a SHARED, REUSED node pool. It is
+ * valid only until the next `buildOctree` call. Do not hold two trees at once
+ * and do not retain one across a step — read what you need and discard it.
+ * This is the price of rebuilding every step without allocating, and the
+ * force loop (which builds then immediately traverses) is the intended use.
  */
 export function buildOctree(state: SimState): Octree | null {
   const { positions, masses, count } = state;

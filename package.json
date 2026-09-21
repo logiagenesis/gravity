@@ -22,7 +22,7 @@
     "licences": "tsx scripts/check-licences.ts",
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run licences && npm run test && npm run build && npm run e2e",
+    "verify": "npm run data:build && npm run format:check && npm run lint && npm run typecheck && npm run licences && npm run test && npm run build && npm run e2e",
     "sitemap": "tsx scripts/build-sitemap.ts"
   },
   "dependencies": {
