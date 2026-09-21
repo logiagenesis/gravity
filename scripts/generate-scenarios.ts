@@ -34,9 +34,11 @@ const RETRIEVED = "2026-09-21";
  */
 const IDEALISATION_NOTE =
   "Idealised coplanar model. Each body starts at its own perihelion. Semi-major " +
-  "axis, eccentricity, mass and radius are from the cited sources; the orbital " +
-  "plane and each orbit's orientation angle are chosen for visual clarity. This " +
-  "is NOT an ephemeris and does not correspond to any real date.";
+  "axis, eccentricity, mass and radius are the true values from the cited sources; " +
+  "the orbital plane and each orbit's orientation angle are chosen for visual " +
+  "clarity. This is NOT an ephemeris and does not correspond to any real date. " +
+  "Radii are physical, not exaggerated: the renderer enforces a minimum on-screen " +
+  "size so small bodies remain visible without altering the simulation.";
 
 interface Vec {
   x: number;
@@ -106,16 +108,15 @@ function toBarycentricFrame<T extends { mass: number; position: Vec; velocity: V
 }
 
 /**
- * Render radii at a visible size.
+ * TRUE physical radius, in AU. No exaggeration.
  *
- * True radii are correct physics but invisible: the Sun is 0.00465 AU across on
- * a 5 AU stage. We exaggerate for display and SAY SO, rather than quietly
- * shipping wrong numbers. Collision contact uses this same radius, so an
- * exaggerated radius means bodies merge sooner — which is why the factor is
- * modest and stated in the scenario's notes.
+ * Radius is used for collision contact, so inflating it here would make bodies
+ * merge at the wrong separation — a physics error introduced purely to solve a
+ * display problem. Visibility is the RENDERER's job: it enforces a minimum
+ * apparent size in pixels (src/render/scene.ts) without touching the physical
+ * value. That keeps the simulation honest and the view readable.
  */
-const DISPLAY_RADIUS_SCALE = 40;
-const displayRadius = (km: number): number => toAu(km) * DISPLAY_RADIUS_SCALE;
+const physicalRadius = (km: number): number => toAu(km);
 
 const SOLAR_SOURCE = {
   provider: "NASA NSSDCA Planetary Fact Sheet; NASA JPL Solar System Dynamics",
@@ -148,7 +149,7 @@ const scenarios: ScenarioDoc[] = [];
       id: SUN.id,
       name: SUN.name,
       mass: 1,
-      radius: displayRadius(SUN.radiusKm),
+      radius: physicalRadius(SUN.radiusKm),
       position: { x: 0, y: 0, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
       colour: SUN.colour,
@@ -157,7 +158,7 @@ const scenarios: ScenarioDoc[] = [];
       id: earth.id,
       name: earth.name,
       mass: earthMass,
-      radius: displayRadius(earth.radiusKm),
+      radius: physicalRadius(earth.radiusKm),
       position: state.position,
       velocity: state.velocity,
       colour: earth.colour,
@@ -202,7 +203,7 @@ const scenarios: ScenarioDoc[] = [];
       id: SUN.id,
       name: SUN.name,
       mass: 1,
-      radius: displayRadius(SUN.radiusKm),
+      radius: physicalRadius(SUN.radiusKm),
       position: { x: 0, y: 0, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
       colour: SUN.colour,
@@ -214,7 +215,7 @@ const scenarios: ScenarioDoc[] = [];
         id: p.id,
         name: p.name,
         mass,
-        radius: displayRadius(p.radiusKm),
+        radius: physicalRadius(p.radiusKm),
         position: s.position,
         velocity: s.velocity,
         colour: p.colour,
@@ -276,7 +277,7 @@ const scenarios: ScenarioDoc[] = [];
         id: SUN.id,
         name: SUN.name,
         mass: 1,
-        radius: displayRadius(SUN.radiusKm),
+        radius: physicalRadius(SUN.radiusKm),
         position: { x: 0, y: 0, z: 0 },
         velocity: { x: 0, y: 0, z: 0 },
         colour: SUN.colour,
@@ -285,7 +286,7 @@ const scenarios: ScenarioDoc[] = [];
         id: jupiter.id,
         name: jupiter.name,
         mass,
-        radius: displayRadius(jupiter.radiusKm),
+        radius: physicalRadius(jupiter.radiusKm),
         position: s.position,
         velocity: s.velocity,
         colour: jupiter.colour,
@@ -321,8 +322,9 @@ const scenarios: ScenarioDoc[] = [];
       url: "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
       notes:
         "Isolated two-body model: the Sun's influence is deliberately excluded so the " +
-        "Earth-Moon orbit can be studied on its own. Body radii are exaggerated for " +
-        "visibility, which is stated here rather than left implicit.",
+        "Earth-Moon orbit can be studied on its own. Body radii are the true physical " +
+        "values; the renderer enforces a minimum on-screen size so small bodies stay " +
+        "visible without altering the physics.",
     },
     physics: {
       softening: 0,
@@ -337,7 +339,7 @@ const scenarios: ScenarioDoc[] = [];
         id: earth.id,
         name: earth.name,
         mass: earthMass,
-        radius: toAu(earth.radiusKm) * 4,
+        radius: toAu(earth.radiusKm),
         position: { x: 0, y: 0, z: 0 },
         velocity: { x: 0, y: 0, z: 0 },
         colour: earth.colour,
@@ -346,7 +348,7 @@ const scenarios: ScenarioDoc[] = [];
         id: MOON.id,
         name: MOON.name,
         mass: moonMass,
-        radius: toAu(MOON.radiusKm) * 4,
+        radius: toAu(MOON.radiusKm),
         position: s.position,
         velocity: s.velocity,
         colour: MOON.colour,
@@ -485,7 +487,7 @@ const scenarios: ScenarioDoc[] = [];
         id: SUN.id,
         name: SUN.name,
         mass: 1,
-        radius: displayRadius(SUN.radiusKm),
+        radius: physicalRadius(SUN.radiusKm),
         position: { x: 0, y: 0, z: 0 },
         velocity: { x: 0, y: 0, z: 0 },
         colour: SUN.colour,
@@ -494,7 +496,7 @@ const scenarios: ScenarioDoc[] = [];
         id: jupiter.id,
         name: jupiter.name,
         mass: jMass,
-        radius: displayRadius(jupiter.radiusKm),
+        radius: physicalRadius(jupiter.radiusKm),
         position: { x: a, y: 0, z: 0 },
         velocity: { x: 0, y: v, z: 0 },
         colour: jupiter.colour,

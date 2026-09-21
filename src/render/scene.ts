@@ -30,11 +30,28 @@ export class GravityScene {
   private trailCursor = 0;
   private trailFilled = 0;
   private meta: BodyMeta[] = [];
+  /** Largest physical radius in the current body set, for display scaling. */
+  private maxRadius = 0;
   private dummy = new THREE.Object3D();
   private colour = new THREE.Color();
   private latest: Float32Array | null = null;
   private frameHandle: number | null = null;
   private disposed = false;
+
+  /**
+   * Minimum apparent radius, in CSS pixels.
+   *
+   * True body radii are correct physics but invisible at solar-system scale:
+   * the Earth is 4.3e-5 AU across on a 4 AU stage, which is well under one
+   * pixel. Manual QA caught exactly this — the planets rendered but could not
+   * be seen.
+   *
+   * The fix belongs in the RENDERER, not the data. Inflating radii in the
+   * scenario files would corrupt collision detection, which uses the same
+   * radius. Here the physical radius is used when it is large enough to see,
+   * and a floor is applied only for display when it is not.
+   */
+  private static readonly MIN_APPARENT_RADIUS_PX = 3;
 
   /** Camera framing distance in scene units. */
   private targetDistance = 5;
@@ -115,6 +132,7 @@ export class GravityScene {
   /** Rebuild instanced geometry when the body set changes. */
   setBodies(meta: BodyMeta[]): void {
     this.meta = meta;
+    this.maxRadius = meta.reduce((max, body) => Math.max(max, body.radius), 0);
     this.disposeBodies();
 
     if (meta.length === 0) return;
@@ -216,11 +234,33 @@ export class GravityScene {
     if (positions && this.bodies) {
       const bodyCount = Math.min(this.meta.length, Math.floor(positions.length / 3));
 
+      // World-space size of one pixel at the camera's current distance:
+      //   visibleHeight = 2 · d · tan(fov/2)
+      // so one pixel spans visibleHeight / viewportHeight world units.
+      const viewportHeight = this.renderer.domElement.clientHeight || 1;
+      const visibleHeight =
+        2 * this.targetDistance * Math.tan((this.camera.fov * Math.PI) / 360);
+      const minRadius =
+        (GravityScene.MIN_APPARENT_RADIUS_PX / viewportHeight) * visibleHeight;
+
       for (let i = 0; i < bodyCount; i++) {
         const k = i * 3;
         this.dummy.position.set(positions[k], positions[k + 1], positions[k + 2]);
-        const r = this.meta[i].radius;
-        this.dummy.scale.setScalar(r);
+
+        // Physical radius wherever it is large enough to see. Below that, a
+        // floor — but a floor that still varies with the body's true size, so
+        // a star does not render the same size as a moon. Clamping everything
+        // to one minimum makes every body identical and throws away the visual
+        // hierarchy entirely.
+        //
+        // Cube root compresses the enormous real range (the Sun is ~100x the
+        // Earth in radius) into a legible ~0.6x-1.5x spread of the floor.
+        // This is display only; physics and collisions use the true radius.
+        const physical = this.meta[i].radius;
+        const relative = this.maxRadius > 0 ? Math.cbrt(physical / this.maxRadius) : 1;
+        const floor = minRadius * (0.6 + 0.9 * relative);
+        this.dummy.scale.setScalar(Math.max(physical, floor));
+
         this.dummy.updateMatrix();
         this.bodies.setMatrixAt(i, this.dummy.matrix);
       }

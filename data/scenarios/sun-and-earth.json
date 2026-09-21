@@ -11,7 +11,7 @@
     "reference": "Planetary Fact Sheet (masses, radii); Approximate Positions of the Planets (a, e)",
     "retrievedAt": "2026-09-21",
     "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/",
-    "notes": "Idealised coplanar model. Each body starts at its own perihelion. Semi-major axis, eccentricity, mass and radius are from the cited sources; the orbital plane and each orbit's orientation angle are chosen for visual clarity. This is NOT an ephemeris and does not correspond to any real date."
+    "notes": "Idealised coplanar model. Each body starts at its own perihelion. Semi-major axis, eccentricity, mass and radius are the true values from the cited sources; the orbital plane and each orbit's orientation angle are chosen for visual clarity. This is NOT an ephemeris and does not correspond to any real date. Radii are physical, not exaggerated: the renderer enforces a minimum on-screen size so small bodies remain visible without altering the simulation."
   },
   "physics": {
     "softening": 0,
@@ -26,7 +26,7 @@
       "id": "sun",
       "name": "Sun",
       "mass": 1,
-      "radius": 0.18601869043848634,
+      "radius": 0.004650467260962158,
       "position": {
         "x": -0.000002952090346608628,
         "y": 0,
@@ -43,7 +43,7 @@
       "id": "earth",
       "name": "Earth",
       "mass": 0.0000030022630123208448,
-      "radius": 0.001705398604981615,
+      "radius": 0.00004263496512454038,
       "position": {
         "x": 0.983288384293343,
         "y": 0,

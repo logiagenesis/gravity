@@ -11,7 +11,7 @@
     "reference": "Earth and Moon fact sheets (mass, radius, lunar orbit a and e)",
     "retrievedAt": "2026-09-21",
     "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
-    "notes": "Isolated two-body model: the Sun's influence is deliberately excluded so the Earth-Moon orbit can be studied on its own. Body radii are exaggerated for visibility, which is stated here rather than left implicit."
+    "notes": "Isolated two-body model: the Sun's influence is deliberately excluded so the Earth-Moon orbit can be studied on its own. Body radii are the true physical values; the renderer enforces a minimum on-screen size so small bodies stay visible without altering the physics."
   },
   "physics": {
     "softening": 0,
@@ -26,7 +26,7 @@
       "id": "earth",
       "name": "Earth",
       "mass": 0.0000030022630123208448,
-      "radius": 0.0001705398604981615,
+      "radius": 0.00004263496512454038,
       "position": {
         "x": -0.00002933634443496077,
         "y": 0,
@@ -43,7 +43,7 @@
       "id": "moon",
       "name": "Moon",
       "mass": 3.671108876037214e-8,
-      "radius": 0.00004647392350885914,
+      "radius": 0.000011618480877214785,
       "position": {
         "x": 0.0023991503599550107,
         "y": 0,
