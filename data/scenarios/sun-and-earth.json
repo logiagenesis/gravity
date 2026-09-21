@@ -6,6 +6,7 @@
   "category": "solar-system",
   "tags": ["two-body", "earth", "sun", "circular", "beginner"],
   "difficulty": "beginner",
+  "featured": true,
   "source": {
     "provider": "NASA NSSDCA Planetary Fact Sheet; NASA JPL Solar System Dynamics",
     "reference": "Planetary Fact Sheet (masses, radii); Approximate Positions of the Planets (a, e)",
@@ -27,16 +28,8 @@
       "name": "Sun",
       "mass": 1,
       "radius": 0.004650467260962158,
-      "position": {
-        "x": -0.000002952090346608628,
-        "y": 0,
-        "z": 0
-      },
-      "velocity": {
-        "x": 0,
-        "y": -5.2515466690794365e-8,
-        "z": 0
-      },
+      "position": { "x": -0.000002952090346608628, "y": 0, "z": 0 },
+      "velocity": { "x": 0, "y": -5.2515466690794365e-8, "z": 0 },
       "colour": "#ffd27f"
     },
     {
@@ -44,21 +37,10 @@
       "name": "Earth",
       "mass": 0.0000030022630123208448,
       "radius": 0.00004263496512454038,
-      "position": {
-        "x": 0.983288384293343,
-        "y": 0,
-        "z": 0
-      },
-      "velocity": {
-        "x": 0,
-        "y": 0.01749196072272104,
-        "z": 0
-      },
+      "position": { "x": 0.983288384293343, "y": 0, "z": 0 },
+      "velocity": { "x": 0, "y": 0.01749196072272104, "z": 0 },
       "colour": "#6b93d6"
     }
   ],
-  "camera": {
-    "distance": 3,
-    "target": "sun"
-  }
+  "camera": { "distance": 3, "target": "sun" }
 }

@@ -11,17 +11,22 @@
  * discs the previous renderer drew.
  */
 import * as THREE from "three";
+import { DEUTERIUM_BURNING_LIMIT_MSUN } from "../sim/constants";
 
 export type BodyClass = "star" | "gas-giant" | "rocky" | "ice" | "moon";
 
 /**
  * Infer a body's visual class from its physical parameters.
  *
+ * This is a VISUAL classification, deliberately not the catalogue's
+ * star/not-a-star one. What matters for drawing is whether an object emits
+ * its own light, and a brown dwarf does; what matters for a catalogue facet
+ * labelled "stars" is whether it is a star, and a brown dwarf is not. The two
+ * boundaries are different quantities and are kept apart on purpose.
+ *
  * Thresholds in solar masses:
- *   > 0.02      — hydrogen fusion is plausible; treat as a star.
- *                 (The hydrogen-burning limit is ≈0.08 M☉; the lower bound here
- *                 keeps brown dwarfs looking self-luminous, which is the
- *                 visually useful answer.)
+ *   > deuterium-burning limit (0.0124 M☉, 13 M_Jup) — self-luminous; draw as
+ *                 a star. This is the IAU planet/brown-dwarf boundary.
  *   > 2e-5      — above roughly half a Neptune: gas giant.
  *   otherwise   — rocky, unless flagged as a moon.
  */
@@ -35,7 +40,7 @@ export function inferBodyClass(massSolar: number, explicit?: string): BodyClass 
   ) {
     return explicit;
   }
-  if (massSolar > 0.02) return "star";
+  if (massSolar > DEUTERIUM_BURNING_LIMIT_MSUN) return "star";
   if (massSolar > 2e-5) return "gas-giant";
   return "rocky";
 }

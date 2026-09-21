@@ -28,3 +28,32 @@ export const FLAG_ACTIVE = 1 << 0;
  * octree is what lets a scenario carry thousands of tracers cheaply.
  */
 export const FLAG_MASSLESS = 1 << 1;
+
+/**
+ * Minimum mass that can sustain hydrogen fusion, in solar masses: the line
+ * between a star and a brown dwarf.
+ *
+ * 0.075 M☉ (about 78.5 Jupiter masses) at solar metallicity, from the
+ * hydrogen-burning minimum mass computed with the CD21 equation of state:
+ * Chabrier, Debras & Baraffe (2023), Astronomy & Astrophysics 671, A119,
+ * https://www.aanda.org/articles/aa/full_html/2023/03/aa43832-22/aa43832-22.html
+ *
+ * The limit is metallicity-dependent (roughly 0.072 to 0.088 M☉ across the
+ * metallicities observed), so it is a boundary with real width. It is used
+ * here only to label a catalogue facet, never to assert what a given object
+ * is.
+ */
+export const HYDROGEN_BURNING_LIMIT_MSUN = 0.075;
+
+/**
+ * Minimum mass that can fuse deuterium, in solar masses: the IAU's working
+ * boundary between a planet and a brown dwarf, and the point above which an
+ * object is self-luminous enough to be drawn as glowing.
+ *
+ * 13 Jupiter masses at solar metallicity, per the IAU Commission F2 working
+ * definition of an exoplanet: Lecavelier des Etangs & Lissauer (2022),
+ * New Astronomy Reviews 94, 101641, https://arxiv.org/abs/2203.09520
+ * Converted with the Jupiter and solar masses used elsewhere in this project:
+ * 13 × 1.898e27 kg / 1.9885e30 kg.
+ */
+export const DEUTERIUM_BURNING_LIMIT_MSUN = (13 * 1.898e27) / 1.9885e30;

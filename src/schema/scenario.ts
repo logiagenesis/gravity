@@ -88,6 +88,17 @@ export const scenarioSchema = z
     category: z.string().min(1),
     tags: z.array(z.string().min(1)).default([]),
     difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("beginner"),
+    /**
+     * Hand-authored scenarios the catalogue leads with.
+     *
+     * 4,432 of 4,439 scenarios are generated in bulk from an archive. Without
+     * this flag the catalogue's first page is 24 arbitrary exoplanet host
+     * names and the seven scenarios written to teach something are 185 pages
+     * away — which is the same failure the audited implementation had
+     * (artifacts/03-current-site-audit.md section 6). Optional and defaulting
+     * to false, so no existing scenario document becomes invalid.
+     */
+    featured: z.boolean().default(false),
     source: sourceSchema,
     physics: physicsSchema,
     bodies: z.array(bodySchema).min(2, "a scenario needs at least two bodies"),

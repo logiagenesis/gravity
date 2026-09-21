@@ -410,6 +410,55 @@ textarea {
   border-radius: var(--radius-lg);
   padding: var(--s-4);
 }
+@media (min-width: 821px) {
+  /* A sidebar this tall should not drag the whole page down with it. */
+  .filters {
+    position: sticky;
+    top: var(--s-4);
+    max-height: calc(100dvh - var(--s-6));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* Above the breakpoint the facets are always shown, so the disclosure
+     control itself is noise. */
+  .filters__summary {
+    display: none;
+  }
+}
+.filters__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--tap);
+  padding: 0 var(--s-3);
+  margin-top: var(--s-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+.filters__summary::-webkit-details-marker {
+  display: none;
+}
+.filters__summary::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: translateY(-2px) rotate(45deg);
+}
+.filters__disclosure[open] > .filters__summary::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+.filters__disclosure > fieldset:first-of-type {
+  margin-top: var(--s-4);
+}
 .filters fieldset {
   border: 0;
   padding: 0;
@@ -483,6 +532,10 @@ textarea {
   gap: var(--s-1);
   margin-top: var(--s-2);
 }
+.badge--featured {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .badge {
   font-size: 0.7rem;
   font-weight: 700;
@@ -492,6 +545,138 @@ textarea {
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   color: var(--text-muted);
+}
+
+.lede {
+  max-width: 68ch;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  margin-bottom: var(--s-5);
+}
+
+/* Category landing links, shown above the full index. */
+.category-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--s-3);
+  margin-bottom: var(--s-5);
+}
+@media (max-width: 560px) {
+  /* Four full-width tiles is a screen and a half before any content. */
+  .category-strip {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-2);
+  }
+  .category-strip__item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: var(--s-2) var(--s-3);
+  }
+}
+.category-strip__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  min-height: var(--tap);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: var(--text);
+}
+.category-strip__item:hover {
+  border-color: var(--accent);
+}
+.category-strip__title {
+  font-weight: 700;
+  font-size: var(--fs-sm);
+}
+.category-strip__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.results-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.results-bar p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: 0;
+}
+
+.check__count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+}
+.btn--small {
+  min-height: 34px;
+  padding: 0 var(--s-2);
+  font-size: var(--fs-xs);
+}
+
+/* Numbered paging: real targets, not infinite scroll. */
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  margin-top: var(--s-5);
+}
+.pager ul {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.pager li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.pager__page {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 var(--s-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.pager__page:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.pager__page[aria-current="page"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.pager__gap {
+  color: var(--text-muted);
+  padding: 0 var(--s-1);
 }
 
 /* ===========================================================================

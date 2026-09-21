@@ -9,6 +9,7 @@
  * Run: npx tsx scripts/generate-scenarios.ts
  */
 import { writeFileSync, mkdirSync } from "node:fs";
+import { format } from "prettier";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -167,6 +168,8 @@ const scenarios: ScenarioDoc[] = [];
 
   scenarios.push({
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    // Hand-authored: the catalogue leads with these.
+    featured: true,
     id: "sun-and-earth",
     name: "The Sun and the Earth",
     summary:
@@ -225,6 +228,8 @@ const scenarios: ScenarioDoc[] = [];
 
   scenarios.push({
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    // Hand-authored: the catalogue leads with these.
+    featured: true,
     id: "inner-solar-system",
     name: "The Inner Solar System",
     summary:
@@ -256,6 +261,8 @@ const scenarios: ScenarioDoc[] = [];
 
   scenarios.push({
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    // Hand-authored: the catalogue leads with these.
+    featured: true,
     id: "sun-and-jupiter",
     name: "The Sun and Jupiter",
     summary:
@@ -308,6 +315,8 @@ const scenarios: ScenarioDoc[] = [];
 
   scenarios.push({
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    // Hand-authored: the catalogue leads with these.
+    featured: true,
     id: "earth-and-moon",
     name: "The Earth and the Moon",
     summary:
@@ -369,6 +378,8 @@ const scenarios: ScenarioDoc[] = [];
 
   scenarios.push({
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    // Hand-authored: the catalogue leads with these.
+    featured: true,
     id: "figure-eight-choreography",
     name: "The Figure-Eight Choreography",
     summary:
@@ -436,26 +447,53 @@ const scenarios: ScenarioDoc[] = [];
   const jupiter = PLANETS.find((p) => p.id === "jupiter")!;
   const jMass = toSolarMasses(jupiter.massE24Kg);
   const a = jupiter.semiMajorAxisAu;
-  // Circular approximation so L4/L5 are exactly the equilateral points.
-  const mu = G_AU3_PER_MSUN_DAY2 * (1 + jMass);
-  const v = Math.sqrt(mu / a);
 
-  const trojan = (angleDeg: number, id: string, name: string, colour: string) => {
-    const t = (angleDeg * Math.PI) / 180;
+  /*
+   * Built ABOUT THE BARYCENTRE, not about the Sun.
+   *
+   * The equilateral points of the circular restricted three-body problem are
+   * equidistant from BOTH primaries, and both primaries circle their common
+   * centre of mass. Putting the Sun at rest at the origin instead — which an
+   * earlier version of this file did — leaves the system with net momentum,
+   * so the whole configuration translates while it runs and L4/L5 slowly stop
+   * being where they were placed. tests/catalog/generated-scenarios.ts checks
+   * every scenario for exactly this.
+   */
+  const total = 1 + jMass;
+  const muSun = 1 / total;
+  const muJup = jMass / total;
+  // Mean motion of the relative orbit: omega^2 a^3 = G(M1 + M2).
+  const omega = Math.sqrt((G_AU3_PER_MSUN_DAY2 * total) / (a * a * a));
+
+  const sunX = -a * muJup;
+  const jupX = a * muSun;
+
+  /** Circular motion about the origin at the shared angular rate. */
+  const circular = (x: number, y: number) => ({
+    position: { x, y, z: 0 },
+    velocity: { x: -omega * y, y: omega * x, z: 0 },
+  });
+
+  const trojan = (sign: 1 | -1, id: string, name: string, colour: string) => {
+    // Apex of the equilateral triangle on the two primaries, measured from
+    // the barycentre: halfway between them, then a*sqrt(3)/2 off the axis.
+    const x = (sunX + jupX) / 2;
+    const y = (sign * a * Math.sqrt(3)) / 2;
     return {
       id,
       name,
       mass: 0,
       radius: 0.06,
-      position: { x: a * Math.cos(t), y: a * Math.sin(t), z: 0 },
-      velocity: { x: -v * Math.sin(t), y: v * Math.cos(t), z: 0 },
       massless: true,
       colour,
+      ...circular(x, y),
     };
   };
 
   scenarios.push({
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    // Hand-authored: the catalogue leads with these.
+    featured: true,
     id: "jupiter-trojan-points",
     name: "Jupiter's Trojan Points",
     summary:
@@ -471,8 +509,9 @@ const scenarios: ScenarioDoc[] = [];
       notes:
         "Jupiter is placed on a CIRCULAR orbit (its real eccentricity of 0.048 is set to " +
         "zero) so that L4 and L5 are exactly the equilateral points of the restricted " +
-        "circular three-body problem. The trojans are massless test particles: they feel " +
-        "gravity but exert none.",
+        "circular three-body problem. The Sun and Jupiter both circle their common " +
+        "barycentre, so the system has no net momentum and does not drift. The trojans " +
+        "are massless test particles: they feel gravity but exert none.",
     },
     physics: {
       softening: 0,
@@ -488,21 +527,19 @@ const scenarios: ScenarioDoc[] = [];
         name: SUN.name,
         mass: 1,
         radius: physicalRadius(SUN.radiusKm),
-        position: { x: 0, y: 0, z: 0 },
-        velocity: { x: 0, y: 0, z: 0 },
         colour: SUN.colour,
+        ...circular(sunX, 0),
       },
       {
         id: jupiter.id,
         name: jupiter.name,
         mass: jMass,
         radius: physicalRadius(jupiter.radiusKm),
-        position: { x: a, y: 0, z: 0 },
-        velocity: { x: 0, y: v, z: 0 },
         colour: jupiter.colour,
+        ...circular(jupX, 0),
       },
-      trojan(60, "l4-greeks", "L4 (Greeks)", "#7ee787"),
-      trojan(-60, "l5-trojans", "L5 (Trojans)", "#79c0ff"),
+      trojan(1, "l4-greeks", "L4 (Greeks)", "#7ee787"),
+      trojan(-1, "l5-trojans", "L5 (Trojans)", "#79c0ff"),
     ],
     camera: { distance: 14, target: "sun" },
   });
@@ -514,6 +551,8 @@ const scenarios: ScenarioDoc[] = [];
 {
   scenarios.push({
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    // Hand-authored: the catalogue leads with these.
+    featured: true,
     id: "three-body-chaos",
     name: "Three-Body Chaos",
     summary:
@@ -573,7 +612,15 @@ for (const doc of scenarios) {
     continue;
   }
   const path = join(OUT_DIR, `${result.scenario.id}.json`);
-  writeFileSync(path, `${JSON.stringify(result.scenario, null, 2)}\n`, "utf8");
+  // Written through Prettier so that regenerating never leaves the repository
+  // failing its own format check. JSON.stringify and Prettier disagree about
+  // short arrays, and the generator losing that argument every time was a
+  // papercut with no upside.
+  const json = await format(JSON.stringify(result.scenario), {
+    parser: "json",
+    filepath: path,
+  });
+  writeFileSync(path, json, "utf8");
   console.log(
     `ok  ${result.scenario.id.padEnd(28)} ${String(result.scenario.bodies.length).padStart(2)} bodies`,
   );

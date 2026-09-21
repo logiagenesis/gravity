@@ -17,10 +17,14 @@
  * no placeholder numbers are ever emitted.
  */
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { format } from "prettier";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { elementsToStateVectors, orbitalPeriodDays } from "../../src/sim/kepler";
 import { safeParseScenario, CURRENT_SCHEMA_VERSION } from "../../src/schema/scenario";
+// One definition of the slug, shared with the catalogue build so it can
+// reconstruct ids from names instead of storing all 4,432 of them.
+import { slugify } from "../../src/catalog/format";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
@@ -96,15 +100,6 @@ const num = (raw: string): number | null => {
   return Number.isFinite(v) ? v : null;
 };
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
-
 /** Visual colour by planet mass, so the catalogue is not monochrome. */
 function planetColour(massEarth: number): string {
   if (massEarth > 100) return "#d8ca9d"; // gas giant
@@ -124,17 +119,40 @@ function starColourHex(teff: number | null): string {
   return "#ff9060";
 }
 
+/**
+ * Morgan-Keenan spectral class from effective temperature.
+ *
+ * Boundaries are the conventional main-sequence ones: O >= 30000 K,
+ * B >= 10000, A >= 7500, F >= 6000, G >= 5200, K >= 3700, M below that.
+ * One table serves both the prose summary and the catalogue tag, so the two
+ * can never disagree about what class a star is.
+ *
+ * A star whose temperature the archive does not record is classed "unknown",
+ * NOT guessed from its mass. Mass-to-temperature is a model, not a
+ * measurement, and this catalogue does not present models as measurements.
+ */
+interface SpectralClass {
+  /** Catalogue tag, kebab-case. */
+  tag: string;
+  /** Noun phrase for the summary sentence, with its article. */
+  phrase: string;
+}
+
+function spectralClass(teff: number | null): SpectralClass {
+  if (teff === null || !Number.isFinite(teff) || teff <= 0) {
+    return { tag: "star-class-unknown", phrase: "a star of unrecorded temperature" };
+  }
+  if (teff >= 30000) return { tag: "o-type-star", phrase: "a blue O-type star" };
+  if (teff >= 10000) return { tag: "b-type-star", phrase: "a blue-white B-type star" };
+  if (teff >= 7500) return { tag: "a-type-star", phrase: "a white A-type star" };
+  if (teff >= 6000) return { tag: "f-type-star", phrase: "a yellow-white F-type star" };
+  if (teff >= 5200) return { tag: "g-type-star", phrase: "a Sun-like G-type star" };
+  if (teff >= 3700) return { tag: "k-type-star", phrase: "an orange K-type dwarf" };
+  return { tag: "m-type-star", phrase: "a cool red M-dwarf" };
+}
+
 function describeStar(teff: number | null, mass: number): string {
-  const t = teff ?? 0;
-  let kind: string;
-  if (t >= 10000) kind = "a hot blue-white star";
-  else if (t >= 7500) kind = "a white A-type star";
-  else if (t >= 6000) kind = "a Sun-like F/G-type star";
-  else if (t >= 5200) kind = "a Sun-like G-type star";
-  else if (t >= 3700) kind = "an orange K-type dwarf";
-  else if (t > 0) kind = "a cool red M-dwarf";
-  else kind = "a star of unrecorded temperature";
-  return `${kind} of ${mass.toFixed(2)} solar masses`;
+  return `${spectralClass(teff).phrase} of ${mass.toFixed(2)} solar masses`;
 }
 
 interface Excluded {
@@ -142,7 +160,7 @@ interface Excluded {
   reason: string;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const rows = parseCsv(readFileSync(SNAPSHOT, "utf8"));
   const header = rows[0];
   const idx = (name: string) => header.indexOf(name);
@@ -361,6 +379,9 @@ function main(): void {
         ...(n > 1 ? ["multi-planet"] : []),
         ...(usable.some((p) => (p.massEarth as number) > 100) ? ["gas-giant"] : []),
         ...(usable.some((p) => (p.massEarth as number) <= 2) ? ["terrestrial"] : []),
+        // Spectral class as a tag, so the catalogue can filter on it without
+        // having to parse the summary prose.
+        spectralClass(planets[0].starTeff).tag,
       ],
       difficulty: n > 2 ? "intermediate" : "beginner",
       source: {
@@ -449,9 +470,12 @@ function main(): void {
     "",
   ].join("\n");
 
+  const reportPath = join(ROOT, "artifacts/09-exoplanet-pipeline-report.md");
+  // Through Prettier, so a pipeline run never leaves the repository failing
+  // its own format check.
   writeFileSync(
-    join(ROOT, "artifacts/09-exoplanet-pipeline-report.md"),
-    report,
+    reportPath,
+    await format(report, { parser: "markdown", filepath: reportPath }),
     "utf8",
   );
 
@@ -461,4 +485,7 @@ function main(): void {
   );
 }
 
-main();
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exit(1);
+});

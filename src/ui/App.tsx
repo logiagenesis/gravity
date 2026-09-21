@@ -18,13 +18,14 @@ const SimulatorPage = lazy(() =>
 );
 import { SavedPage } from "./SavedPage";
 import { AboutPage, PrivacyPage } from "./StaticPages";
-import { loadScenario } from "../catalog";
+import { loadCatalogue } from "../catalog";
 import { decodeScenario, sharePayloadFromHash } from "../share/link";
 import { getSavedScenario } from "../storage/saved-scenarios";
 import type { Scenario } from "../schema/scenario";
 
 type Route =
   | { kind: "catalogue" }
+  | { kind: "category"; id: string }
   | { kind: "scenario"; id: string }
   | { kind: "saved" }
   | { kind: "savedScenario"; id: string }
@@ -44,6 +45,9 @@ function parseHash(hash: string): Route {
 
   const scenario = /^scenario\/([a-z0-9-]+)$/.exec(path);
   if (scenario) return { kind: "scenario", id: scenario[1] };
+
+  const category = /^category\/([a-z0-9-]+)$/.exec(path);
+  if (category) return { kind: "category", id: category[1] };
 
   const saved = /^saved\/(.+)$/.exec(path);
   if (saved) return { kind: "savedScenario", id: decodeURIComponent(saved[1]) };
@@ -70,7 +74,7 @@ export function App() {
     const resolve = async (): Promise<Scenario | null> => {
       switch (route.kind) {
         case "scenario":
-          return loadScenario(route.id);
+          return (await loadCatalogue()).scenario(route.id);
         case "savedScenario":
           return getSavedScenario(route.id);
         case "shared":
@@ -151,6 +155,13 @@ export function App() {
     switch (route.kind) {
       case "catalogue":
         return <CataloguePage onOpen={(id) => navigate(`#/scenario/${id}`)} />;
+      case "category":
+        return (
+          <CataloguePage
+            category={route.id}
+            onOpen={(id) => navigate(`#/scenario/${id}`)}
+          />
+        );
       case "saved":
         return (
           <SavedPage
@@ -220,7 +231,11 @@ export function App() {
         </a>
         <nav aria-label="Main">
           <ul>
-            {navLink("#/", "Scenarios", route.kind === "catalogue")}
+            {navLink(
+              "#/",
+              "Scenarios",
+              route.kind === "catalogue" || route.kind === "category",
+            )}
             {navLink("#/saved", "Saved", route.kind === "saved")}
             {navLink("#/about", "About", route.kind === "about")}
           </ul>
