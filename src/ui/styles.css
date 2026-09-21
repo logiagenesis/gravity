@@ -1,30 +1,69 @@
-/*
- * Design tokens and base styles.
- *
- * Colour choices are checked for contrast: body text on the page background
- * and on cards exceeds 4.5:1, and the focus ring is a high-contrast 3px
- * outline with an offset so it is visible against every surface.
- */
+/* ===========================================================================
+   Design tokens.
+
+   Defined once, used everywhere. The previous stylesheet mixed ad-hoc colours
+   and spacing with default browser control styling, which is what made the UI
+   read as a prototype. Every value a component needs comes from here.
+
+   Contrast: body text on --bg and on --surface both exceed 4.5:1; the focus
+   ring is a 3px high-contrast outline with an offset so it is visible on every
+   surface.
+   =========================================================================== */
 :root {
-  --bg: #070a12;
-  --bg-raised: #10151f;
-  --bg-input: #161c28;
-  --border: #2a3445;
-  --border-strong: #3d4a60;
-  --text: #eef2f8;
-  --text-muted: #a7b3c6;
+  /* Surfaces, dark to light */
+  --bg: #05070e;
+  --surface: #0d1320;
+  --surface-2: #131b2b;
+  --surface-3: #1b2436;
+  --overlay: rgb(9 14 24 / 0.86);
+
+  --border: #26314a;
+  --border-strong: #3a4763;
+
+  --text: #eaf0fa;
+  --text-muted: #9fb0cc;
+  --text-dim: #6f809c;
+
   --accent: #7cc4ff;
-  --accent-strong: #a9dbff;
-  --accent-ink: #04131f;
-  --good: #7ee787;
-  --warn: #ffcc66;
-  --bad: #ff8087;
+  --accent-strong: #b3dfff;
+  --accent-ink: #04121f;
+
+  --good: #6ee7a0;
+  --warn: #ffd166;
+  --bad: #ff8fa3;
+
+  /* Type scale */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 2rem;
+
+  /* Spacing scale */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  --radius-sm: 6px;
   --radius: 10px;
+  --radius-lg: 16px;
+
+  --shadow: 0 8px 28px rgb(0 0 0 / 0.45);
   --focus: 3px solid var(--accent-strong);
+
   --font:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --header-h: 52px;
+  /* Minimum comfortable touch target. */
+  --tap: 44px;
 }
 
 *,
@@ -44,40 +83,48 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 16px;
+  font-size: var(--fs-md);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
 h1,
 h2,
 h3 {
   line-height: 1.2;
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--s-2);
   font-weight: 650;
+  letter-spacing: -0.01em;
 }
-
+h1 {
+  font-size: var(--fs-2xl);
+}
+h2 {
+  font-size: var(--fs-lg);
+}
+h3 {
+  font-size: var(--fs-md);
+}
 p {
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--s-3);
 }
-
 a {
   color: var(--accent);
 }
 
-/* A single, consistent, always-visible focus indicator. */
 :focus-visible {
   outline: var(--focus);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .skip-link {
   position: absolute;
   left: -9999px;
   top: 0;
-  z-index: 100;
-  padding: 0.75rem 1rem;
+  z-index: 200;
+  padding: var(--s-3) var(--s-4);
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 650;
@@ -99,64 +146,111 @@ a {
   border: 0;
 }
 
-/* ---------- layout ---------- */
+/* ===========================================================================
+   App shell
+   =========================================================================== */
 
 .app {
   display: flex;
   flex-direction: column;
   min-height: 100%;
 }
+/*
+ * On the simulator route the shell becomes a fixed-height frame so the canvas
+ * can fill the viewport. Elsewhere the page scrolls normally.
+ */
+.app[data-immersive="true"] {
+  height: 100dvh;
+  overflow: hidden;
+}
 
 .site-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  padding: 0.75rem 1rem;
+  gap: var(--s-4);
+  height: var(--header-h);
+  padding: 0 var(--s-4);
   border-bottom: 1px solid var(--border);
-  background: var(--bg-raised);
+  background: var(--surface);
+  flex: none;
+  z-index: 20;
 }
-
 .site-header .brand {
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: var(--fs-md);
   color: var(--text);
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  white-space: nowrap;
 }
-
+.site-header .brand svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
 .site-header nav ul {
   display: flex;
-  gap: 0.25rem;
+  gap: var(--s-1);
   list-style: none;
   margin: 0;
   padding: 0;
 }
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--s-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.nav-link:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.nav-link[aria-current="page"] {
+  color: var(--text);
+  background: var(--surface-3);
+}
 
 .main {
   flex: 1;
-  padding: 1.25rem 1rem 3rem;
-  max-width: 1200px;
+  min-height: 0;
+  padding: var(--s-5) var(--s-4) var(--s-7);
+  max-width: 1280px;
   width: 100%;
   margin: 0 auto;
+}
+/* The simulator manages its own padding and must not be width-clamped. */
+.app[data-immersive="true"] .main {
+  padding: 0;
+  max-width: none;
+  overflow: hidden;
 }
 
 .site-footer {
   border-top: 1px solid var(--border);
-  padding: 1rem;
+  padding: var(--s-4);
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
 }
 .site-footer ul {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--s-4);
   list-style: none;
-  margin: 0.5rem 0 0;
+  margin: var(--s-2) 0 0;
   padding: 0;
 }
 
-/* ---------- controls ---------- */
+/* ===========================================================================
+   Controls
+   =========================================================================== */
 
 button,
 select,
@@ -170,22 +264,27 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  min-height: 44px;
-  padding: 0.5rem 0.9rem;
+  gap: var(--s-2);
+  min-height: var(--tap);
+  padding: 0 var(--s-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: var(--bg-input);
+  background: var(--surface-2);
   color: var(--text);
   cursor: pointer;
-  font-weight: 550;
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
 .btn:hover:not(:disabled) {
   border-color: var(--accent);
-  background: #1c2433;
+  background: var(--surface-3);
 }
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .btn--primary {
@@ -195,238 +294,486 @@ textarea {
 }
 .btn--primary:hover:not(:disabled) {
   background: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 .btn--ghost {
   background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.btn--icon {
+  width: var(--tap);
+  padding: 0;
 }
 .btn[aria-pressed="true"] {
   border-color: var(--accent);
-  background: #1e2b3b;
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* Custom select so primary controls do not look like default browser widgets. */
+.select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.select select {
+  appearance: none;
+  min-height: var(--tap);
+  padding: 0 var(--s-6) 0 var(--s-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+.select select:hover {
+  border-color: var(--accent);
+}
+.select::after {
+  content: "";
+  position: absolute;
+  right: var(--s-3);
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: translateY(-2px) rotate(45deg);
+  pointer-events: none;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 0.85rem;
+  gap: var(--s-1);
+  margin-bottom: var(--s-3);
+  min-width: 0;
 }
 .field label,
 .field .field-label {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--fs-xs);
+  font-weight: 700;
   color: var(--text-muted);
-}
-.field input {
-  max-width: 100%;
-  min-width: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 .field input[type="text"],
 .field input[type="search"],
-.field input[type="number"],
-.field select {
-  min-height: 44px;
-  padding: 0.5rem 0.65rem;
-  background: var(--bg-input);
+.field input[type="number"] {
+  min-height: var(--tap);
+  padding: 0 var(--s-3);
+  background: var(--surface-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
+  color: var(--text);
+  max-width: 100%;
+  min-width: 0;
+}
+.field input:hover {
+  border-color: var(--accent);
 }
 .field-hint {
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
+  margin: 0;
 }
 
-/* ---------- catalogue ---------- */
+/* ===========================================================================
+   Catalogue
+   =========================================================================== */
 
 .catalogue-layout {
   display: grid;
-  grid-template-columns: 250px 1fr;
-  gap: 1.5rem;
+  grid-template-columns: 260px 1fr;
+  gap: var(--s-5);
   align-items: start;
 }
-@media (max-width: 800px) {
+.catalogue-layout > * {
+  min-width: 0;
+}
+@media (max-width: 820px) {
   .catalogue-layout {
     grid-template-columns: 1fr;
   }
 }
 
 .filters {
-  background: var(--bg-raised);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem;
+  border-radius: var(--radius-lg);
+  padding: var(--s-4);
 }
 .filters fieldset {
   border: 0;
   padding: 0;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--s-4);
 }
 .filters legend {
-  font-size: 0.85rem;
-  font-weight: 650;
+  font-size: var(--fs-xs);
+  font-weight: 700;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   padding: 0;
-  margin-bottom: 0.4rem;
+  margin-bottom: var(--s-2);
 }
 .filters .check {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--s-2);
   min-height: 34px;
+  font-size: var(--fs-sm);
 }
 .filters .check input {
   width: 18px;
   height: 18px;
   accent-color: var(--accent);
+  flex: none;
 }
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: var(--s-4);
   list-style: none;
   padding: 0;
   margin: 0;
 }
-
 .card {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-raised);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1rem;
+  border-radius: var(--radius-lg);
+  padding: var(--s-4);
+  transition:
+    border-color 0.12s ease,
+    transform 0.12s ease;
+}
+.card:hover {
+  border-color: var(--border-strong);
 }
 .card h3 {
-  font-size: 1.02rem;
-  margin-bottom: 0.35rem;
+  font-size: var(--fs-md);
+  margin-bottom: var(--s-2);
 }
 .card h3 a {
   color: var(--text);
   text-decoration: none;
 }
 .card h3 a:hover {
-  text-decoration: underline;
+  color: var(--accent);
 }
 .card p {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--fs-sm);
   flex: 1;
 }
 .badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
+  gap: var(--s-1);
+  margin-top: var(--s-2);
 }
 .badge {
-  font-size: 0.72rem;
-  font-weight: 650;
+  font-size: 0.7rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 0.15rem 0.45rem;
+  letter-spacing: 0.04em;
+  padding: 2px var(--s-2);
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   color: var(--text-muted);
 }
 
-/* ---------- simulator ---------- */
+/* ===========================================================================
+   Simulator shell — the canvas IS the page
+   =========================================================================== */
 
-.sim-layout {
-  display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 1rem;
-  align-items: start;
-}
-
-/*
- * Grid and flex items default to min-width: auto, so an item containing
- * something wide (the canvas, a five-column table) refuses to shrink below its
- * content and pushes the page sideways. Measured as 42px of horizontal overflow
- * on a 393px viewport before this. min-width: 0 lets them shrink; the tables
- * then scroll inside their own panel, which is where scrolling belongs.
- */
-.sim-layout > *,
-.catalogue-layout > * {
-  min-width: 0;
-}
-@media (max-width: 950px) {
-  .sim-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-.viewport {
+.sim {
   position: relative;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: #05070d;
-}
-.viewport canvas {
-  display: block;
   width: 100%;
-  height: clamp(320px, 60vh, 640px);
+  height: calc(100dvh - var(--header-h));
+  overflow: hidden;
+  background: #04060c;
+}
+.sim__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Without this the browser consumes the gesture before our handlers see it. */
   touch-action: none;
 }
 
-.transport {
+/* Title strip floating over the canvas. */
+.sim__head {
+  position: absolute;
+  top: var(--s-3);
+  left: var(--s-3);
+  right: var(--s-3);
+  z-index: 6;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem;
-  border-top: 1px solid var(--border);
-  background: var(--bg-raised);
+  align-items: flex-start;
+  gap: var(--s-3);
+  pointer-events: none;
+}
+.sim__head > * {
+  pointer-events: auto;
+}
+.sim__tools {
+  display: flex;
+  gap: var(--s-2);
+  margin-left: auto;
+  flex: none;
 }
 
-.panel {
-  background: var(--bg-raised);
+.sim__title {
+  background: var(--overlay);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem;
-  margin-bottom: 1rem;
+  padding: var(--s-2) var(--s-3);
+  max-width: min(52ch, calc(100% - 120px));
 }
-.panel h2 {
-  font-size: 0.95rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.sim__title h1 {
+  font-size: var(--fs-lg);
+  margin: 0;
+}
+.sim__title p {
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* ---------- tabs (real ARIA tabs) ---------- */
+/* Transport bar: always visible, never scrolled away. */
+.sim__transport {
+  position: absolute;
+  left: 50%;
+  bottom: var(--s-3);
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2);
+  background: var(--overlay);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  max-width: calc(100% - var(--s-5));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sim__transport::-webkit-scrollbar {
+  display: none;
+}
+.sim__clock {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  padding: 0 var(--s-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Side panel: overlay on desktop, bottom sheet on mobile. */
+.sim__panel {
+  position: absolute;
+  top: var(--s-3);
+  right: var(--s-3);
+  bottom: 84px;
+  width: 392px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  background: var(--overlay);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.sim__panel[hidden] {
+  display: none;
+}
+.sim__panel-body {
+  overflow-y: auto;
+  padding: 0 var(--s-4) var(--s-4);
+  min-height: 0;
+}
+.sim__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-2) 0 var(--s-4);
+}
+
+.sim__warnings {
+  position: absolute;
+  left: var(--s-3);
+  bottom: 84px;
+  z-index: 7;
+  max-width: min(46ch, calc(100% - var(--s-5)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+@media (max-width: 900px) {
+  /*
+   * Bottom sheet with an EXACT height, not a max-height.
+   *
+   * It previously used max-height, so the sheet's real height depended on its
+   * content while the transport bar was positioned against the max. The
+   * transport ended up floating in the middle of the canvas above empty space.
+   * A fixed height makes "directly above the sheet" an exact calculation.
+   */
+  .sim__panel {
+    --sheet-h: 52dvh;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: var(--sheet-h);
+    max-height: none;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .sim__transport {
+    left: var(--s-2);
+    right: var(--s-2);
+    transform: none;
+    max-width: none;
+    justify-content: center;
+    bottom: calc(var(--s-2) + env(safe-area-inset-bottom, 0px));
+  }
+  /* Sit exactly on top of the sheet when it is open. */
+  .sim[data-panel="open"] .sim__transport {
+    bottom: calc(52dvh + var(--s-2));
+  }
+
+  .sim__head {
+    top: var(--s-2);
+    left: var(--s-2);
+    right: var(--s-2);
+    gap: var(--s-2);
+  }
+  .sim__title {
+    max-width: none;
+    flex: 1;
+  }
+  .sim__title h1 {
+    font-size: var(--fs-md);
+  }
+  /* One line on a phone: the full text lives in the panel. */
+  .sim__title p {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+
+  .sim__warnings {
+    bottom: auto;
+    top: 84px;
+    left: var(--s-2);
+    right: var(--s-2);
+    max-width: none;
+  }
+
+  /* Give the header room to keep every nav item reachable. */
+  .site-header {
+    padding: 0 var(--s-2);
+    gap: var(--s-2);
+  }
+  .site-header .brand span {
+    display: none;
+  }
+  .nav-link {
+    padding: 0 var(--s-2);
+  }
+}
+
+/* ===========================================================================
+   Panels, tabs, tables
+   =========================================================================== */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--s-4);
+  margin-bottom: var(--s-4);
+}
+.panel h2 {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: var(--s-3);
+}
 
 .tabs {
   display: flex;
-  gap: 0.25rem;
+  gap: 2px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 0.85rem;
+  margin-bottom: var(--s-3);
   overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+/* Fade the right edge so a clipped tab reads as "scroll me", not "broken". */
+.tabs {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
 }
 .tab {
-  min-height: 44px;
-  padding: 0.5rem 0.8rem;
+  min-height: var(--tap);
+  padding: 0 var(--s-2);
+  font-size: var(--fs-xs);
   background: transparent;
   border: 0;
   border-bottom: 2px solid transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 650;
+  font-size: var(--fs-sm);
   white-space: nowrap;
+}
+.tab:hover {
+  color: var(--text);
 }
 .tab[aria-selected="true"] {
   color: var(--text);
   border-bottom-color: var(--accent);
 }
-
-/* ---------- diagnostics ---------- */
-
-/*
- * Tables must scroll INSIDE their panel, never push the page sideways.
- * The five-column body table overflowed a 393px viewport by 42px before this.
- */
-[role="tabpanel"],
-.panel {
+[role="tabpanel"] {
   max-width: 100%;
   overflow-x: auto;
 }
@@ -434,13 +781,23 @@ textarea {
 .diagnostics {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
 }
 .diagnostics th,
 .diagnostics td {
   text-align: left;
-  padding: 0.35rem 0.4rem;
+  padding: var(--s-2) var(--s-1);
   border-bottom: 1px solid var(--border);
+  vertical-align: baseline;
+}
+/* Body names should not wrap mid-word and squeeze the numbers. */
+.diagnostics th[scope="row"] {
+  white-space: nowrap;
+  padding-right: var(--s-2);
+}
+.diagnostics thead th {
+  font-size: var(--fs-xs);
+  white-space: nowrap;
 }
 .diagnostics th {
   color: var(--text-muted);
@@ -450,6 +807,7 @@ textarea {
   font-family: var(--mono);
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .drift-good {
   color: var(--good);
@@ -462,12 +820,13 @@ textarea {
 }
 
 .notice {
-  padding: 0.7rem 0.85rem;
+  padding: var(--s-3);
   border-radius: var(--radius);
   border: 1px solid var(--border-strong);
-  background: var(--bg-input);
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
+  background: var(--overlay);
+  backdrop-filter: blur(10px);
+  margin-bottom: var(--s-3);
+  font-size: var(--fs-sm);
 }
 .notice--warn {
   border-color: var(--warn);
@@ -477,19 +836,65 @@ textarea {
 }
 
 .source-note {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 .source-note dt {
-  font-weight: 650;
+  font-weight: 700;
   color: var(--text);
-  margin-top: 0.5rem;
+  margin-top: var(--s-2);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .source-note dd {
   margin: 0;
 }
 
-/* Respect a reduced-motion preference globally. */
+/* ===========================================================================
+   Dialog
+   =========================================================================== */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(0 0 0 / 0.62);
+  display: grid;
+  place-items: center;
+  padding: var(--s-4);
+}
+.dialog {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: var(--s-5);
+  max-width: 480px;
+  width: 100%;
+  max-height: 85dvh;
+  overflow-y: auto;
+}
+.dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+}
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -501,12 +906,70 @@ textarea {
   }
 }
 
-/* Honour forced-colors / high-contrast mode. */
 @media (forced-colors: active) {
   .btn,
   .card,
   .panel,
-  .filters {
+  .filters,
+  .sim__panel,
+  .sim__transport,
+  .dialog {
     border: 1px solid CanvasText;
   }
+}
+
+/* ===========================================================================
+   Body labels — DOM text positioned over the canvas by the render loop.
+   Marked aria-hidden because the Bodies table is the authoritative listing;
+   duplicating every name into the accessibility tree would be noise.
+   =========================================================================== */
+.sim__labels {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+.body-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: rgb(234 240 250 / 0.92);
+  text-shadow:
+    0 0 3px rgb(0 0 0 / 0.95),
+    0 1px 2px rgb(0 0 0 / 0.9);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+/* View-panel toggle groups and focusable body rows. */
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.body-focus {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px dotted var(--border-strong);
+}
+.body-focus:hover {
+  color: var(--accent);
+}
+.body-focus[aria-pressed="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.diagnostics tr[data-focused="true"] {
+  background: rgb(124 196 255 / 0.08);
 }

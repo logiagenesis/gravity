@@ -1,4 +1,17 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+/**
+ * Open a panel tab. The simulator now presents its controls in an overlay
+ * panel rather than inline, so tests must open the relevant tab first. The
+ * panel is open by default at desktop width.
+ */
+async function openTab(page: Page, name: string) {
+  const tab = page.getByRole("tab", { name });
+  if (!(await tab.isVisible())) {
+    await page.getByRole("button", { name: /Show details panel/ }).click();
+  }
+  await tab.click();
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/#/scenario/sun-and-earth");
@@ -30,7 +43,7 @@ test.describe("simulator", () => {
   });
 
   test("advances simulated time while playing", async ({ page }) => {
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    await openTab(page, "Diagnostics");
     await page.getByRole("button", { name: "Play" }).click();
 
     // Simulated time must become non-zero.
@@ -58,7 +71,8 @@ test.describe("simulator", () => {
   });
 
   test("switches integrator and shows its guidance", async ({ page }) => {
-    const picker = page.getByLabel("Method");
+    await openTab(page, "View");
+    const picker = page.getByLabel("Integrator");
     await picker.selectOption("rk4");
     await expect(picker).toHaveValue("rk4");
     // The trade-off must be stated, not hidden.
@@ -69,7 +83,7 @@ test.describe("simulator", () => {
   });
 
   test("steps once while paused", async ({ page }) => {
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    await openTab(page, "Diagnostics");
     await page.getByRole("button", { name: "Step" }).click();
     await expect
       .poll(async () => {
@@ -80,7 +94,7 @@ test.describe("simulator", () => {
   });
 
   test("resets back to the start", async ({ page }) => {
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    await openTab(page, "Diagnostics");
     await page.getByRole("button", { name: "Play" }).click();
     await page.waitForTimeout(600);
     await page.getByRole("button", { name: "Reset" }).click();
@@ -94,7 +108,7 @@ test.describe("simulator", () => {
   });
 
   test("shows conservation diagnostics", async ({ page }) => {
-    await page.getByRole("tab", { name: "Diagnostics" }).click();
+    await openTab(page, "Diagnostics");
     await expect(page.getByRole("row", { name: /Energy drift/ })).toBeVisible();
     await expect(
       page.getByRole("row", { name: /Angular momentum drift/ }),
@@ -103,7 +117,7 @@ test.describe("simulator", () => {
   });
 
   test("shows the data source citation", async ({ page }) => {
-    await page.getByRole("tab", { name: "Source" }).click();
+    await openTab(page, "Source");
     await expect(page.getByText("NASA NSSDCA Planetary Fact Sheet")).toBeVisible();
     await expect(page.getByText(/Idealised coplanar model/)).toBeVisible();
   });
@@ -111,6 +125,7 @@ test.describe("simulator", () => {
   test("creates a share link that carries the scenario in the fragment", async ({
     page,
   }) => {
+    await openTab(page, "Share");
     await page.getByRole("button", { name: "Share link" }).click();
     const input = page.getByLabel("Shareable link");
     await expect(input).toBeVisible();
@@ -121,6 +136,7 @@ test.describe("simulator", () => {
   });
 
   test("a share link round-trips into a working simulation", async ({ page }) => {
+    await openTab(page, "Share");
     await page.getByRole("button", { name: "Share link" }).click();
     const shareUrl = await page.getByLabel("Shareable link").inputValue();
 
@@ -140,6 +156,7 @@ test.describe("simulator", () => {
   });
 
   test("saves a scenario locally and lists it", async ({ page }) => {
+    await openTab(page, "Share");
     await page.getByRole("button", { name: "Save locally" }).click();
     await expect(page.getByText("Saved to this browser.")).toBeVisible();
 
