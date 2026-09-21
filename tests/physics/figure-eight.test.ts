@@ -68,7 +68,7 @@ describe("figure-eight choreography", () => {
       g: 1,
       dt,
       integrator: "pefrl",
-      collisionsEnabled: false,
+      collisionMode: "pass-through",
     });
 
     const start = Array.from(sim.state.positions.slice(0, 9));
@@ -84,7 +84,7 @@ describe("figure-eight choreography", () => {
       g: 1,
       dt: PERIOD / 20000,
       integrator: "verlet",
-      collisionsEnabled: false,
+      collisionMode: "pass-through",
     });
 
     sim.stepFixed(20000);
@@ -105,7 +105,7 @@ describe("figure-eight choreography", () => {
         g: 1,
         dt: PERIOD / 2000,
         integrator,
-        collisionsEnabled: false,
+        collisionMode: "pass-through",
       });
       sim.stepFixed(2000 * 20); // twenty periods
       return sim.diagnostics().energyDrift;

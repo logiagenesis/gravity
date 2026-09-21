@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "jupiter-trojan-points",
   "name": "Jupiter's Trojan Points",
   "summary": "Massless test particles placed 60 degrees ahead of and behind Jupiter, at the L4 and L5 Lagrange points. Real asteroid families sit here, held in place by the combined pull of the Sun and Jupiter.",
@@ -20,7 +20,7 @@
     "dt": 1,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": false
+    "collisionMode": "pass-through"
   },
   "bodies": [
     {

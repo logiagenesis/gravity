@@ -14,7 +14,7 @@
 import { z } from "zod";
 
 /** Current schema version. Increment when making a breaking change, and add a migration. */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /**
  * A finite number. Uses Zod's built-in `.finite()` rather than `.refine()` so
@@ -73,7 +73,14 @@ export const physicsSchema = z.object({
   dt: finite("dt").positive("dt must be positive"),
   forceMode: z.enum(["auto", "direct", "barnes-hut"]).default("auto"),
   theta: finite("theta").positive().max(2).default(0.5),
-  collisions: z.boolean().default(true),
+  /**
+   * What happens when two bodies touch.
+   *
+   * Replaces the v1 boolean `collisions`, which could only say "merge" or
+   * "nothing". A v1 document is migrated: false becomes "pass-through" and
+   * true becomes "merge", so no existing scenario changes behaviour.
+   */
+  collisionMode: z.enum(["merge", "elastic", "pass-through"]).default("merge"),
 });
 
 export const scenarioSchema = z

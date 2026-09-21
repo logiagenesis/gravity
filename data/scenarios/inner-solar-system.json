@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "inner-solar-system",
   "name": "The Inner Solar System",
   "summary": "Mercury, Venus, Earth and Mars around the Sun. Mercury's orbit is the most eccentric of the four, and you can see it speed up near perihelion.",
@@ -20,7 +20,7 @@
     "dt": 0.25,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": true
+    "collisionMode": "merge"
   },
   "bodies": [
     {

@@ -190,4 +190,19 @@ test.describe("simulator", () => {
       page.getByRole("button", { name: "Body A", exact: true }),
     ).toHaveAttribute("aria-pressed", "false");
   });
+
+  test("switches the contact mode and states which law it obeys", async ({ page }) => {
+    await openTab(page, "View");
+    const picker = page.getByLabel("On contact");
+    await expect(picker).toHaveValue("merge");
+    await expect(page.getByText(/Kinetic energy DROPS/)).toBeVisible();
+
+    await picker.selectOption("elastic");
+    await expect(
+      page.getByText(/Momentum and kinetic energy are both conserved/),
+    ).toBeVisible();
+
+    await picker.selectOption("pass-through");
+    await expect(page.getByText(/bodies fall through each other/)).toBeVisible();
+  });
 });

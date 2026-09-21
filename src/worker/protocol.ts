@@ -15,6 +15,7 @@
  */
 import type { Scenario } from "../schema/scenario";
 import type { IntegratorName } from "../sim/integrators";
+import type { CollisionMode } from "../sim/collisions";
 import type { ForceMode } from "../sim/forces";
 
 export type MainToWorker =
@@ -28,7 +29,7 @@ export type MainToWorker =
   | { type: "setTimestep"; dt: number }
   | { type: "setForceMode"; mode: ForceMode | "auto" }
   | { type: "setSoftening"; softening: number }
-  | { type: "setCollisions"; enabled: boolean }
+  | { type: "setCollisionMode"; mode: CollisionMode }
   | { type: "requestSnapshot" }
   /** Hand a used buffer back so the worker can reuse it. */
   | { type: "recycle"; buffer: ArrayBuffer }

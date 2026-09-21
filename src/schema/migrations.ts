@@ -12,13 +12,37 @@ import { CURRENT_SCHEMA_VERSION, parseScenario, type Scenario } from "./scenario
 export type Migration = (doc: Record<string, unknown>) => Record<string, unknown>;
 
 /**
+ * v1 -> v2: `physics.collisions` (boolean) becomes `physics.collisionMode`.
+ *
+ * v1 could only express "merge on contact" or "do nothing". v2 adds an
+ * elastic mode, which a boolean cannot carry. The mapping preserves every v1
+ * document's behaviour exactly:
+ *
+ *   collisions: true   ->  collisionMode: "merge"         (the v1 behaviour)
+ *   collisions: false  ->  collisionMode: "pass-through"  (the v1 behaviour)
+ *   absent             ->  collisionMode: "merge"         (the v1 default)
+ */
+const v1ToV2: Migration = (doc) => {
+  const physics = doc.physics;
+  if (typeof physics !== "object" || physics === null) return doc;
+  const next = { ...(physics as Record<string, unknown>) };
+  const collisions = next.collisions;
+  delete next.collisions;
+  // Only supply a mode if the document does not already carry one, so a
+  // hand-written hybrid is not silently overwritten.
+  if (next.collisionMode === undefined) {
+    next.collisionMode = collisions === false ? "pass-through" : "merge";
+  }
+  return { ...doc, physics: next };
+};
+
+/**
  * Keyed by the version being migrated FROM.
  *
- * Empty at v1 because v1 is the first published version. The machinery is here
- * from the start so that adding v2 is a one-entry change rather than a
- * retrofit — and so the "document from the future" path is tested today.
+ * The machinery was built at v1, before there was anything to migrate, so
+ * that adding v2 would be a one-entry change rather than a retrofit. It was.
  */
-export const migrations: Readonly<Record<number, Migration>> = {};
+export const migrations: Readonly<Record<number, Migration>> = { 1: v1ToV2 };
 
 export class SchemaVersionError extends Error {
   constructor(message: string) {

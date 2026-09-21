@@ -188,7 +188,7 @@ describe("conservation baseline after a merge", () => {
       g: 1,
       dt: 1e-3,
       integrator: "verlet",
-      collisionsEnabled: true,
+      collisionMode: "merge",
     });
 
     expect(sim.baselineResets).toBe(0);
@@ -202,5 +202,173 @@ describe("conservation baseline after a merge", () => {
     // than reporting the inelastic energy loss as numerical failure. A run of
     // the three-body scenario reported 100% "drift" before this was fixed.
     expect(sim.diagnostics().energyDrift).toBeLessThan(1e-6);
+  });
+});
+
+/**
+ * Collision modes.
+ *
+ * Each mode obeys a DIFFERENT conservation law, and the tests assert the one
+ * that mode actually obeys rather than a single blanket rule:
+ *
+ *   merge         momentum conserved, kinetic energy strictly decreases
+ *   elastic       momentum AND kinetic energy both conserved
+ *   pass-through  nothing applied on contact
+ *
+ * Asserting energy conservation across a merge, or energy loss across an
+ * elastic bounce, would each be asserting the wrong physics.
+ */
+describe("collision modes", () => {
+  /** Two equal bodies moving straight at each other along x. */
+  function headOn(speed = 1, mass = 1) {
+    return SimState.fromBodies([
+      {
+        id: "a",
+        name: "A",
+        mass,
+        radius: 1,
+        position: { x: -0.8, y: 0, z: 0 },
+        velocity: { x: speed, y: 0, z: 0 },
+      },
+      {
+        id: "b",
+        name: "B",
+        mass,
+        radius: 1,
+        position: { x: 0.8, y: 0, z: 0 },
+        velocity: { x: -speed, y: 0, z: 0 },
+      },
+    ]);
+  }
+
+  const momentum = (s: SimState) => {
+    let px = 0;
+    let py = 0;
+    let pz = 0;
+    for (let i = 0; i < s.count; i++) {
+      px += s.masses[i] * s.velocities[i * 3];
+      py += s.masses[i] * s.velocities[i * 3 + 1];
+      pz += s.masses[i] * s.velocities[i * 3 + 2];
+    }
+    return { px, py, pz };
+  };
+
+  const kinetic = (s: SimState) => {
+    let total = 0;
+    for (let i = 0; i < s.count; i++) {
+      const k = i * 3;
+      total +=
+        0.5 *
+        s.masses[i] *
+        (s.velocities[k] ** 2 + s.velocities[k + 1] ** 2 + s.velocities[k + 2] ** 2);
+    }
+    return total;
+  };
+
+  it("pass-through does nothing at all", () => {
+    const state = headOn();
+    const before = [...state.velocities];
+    const events = resolveCollisions(state, "pass-through");
+    expect(events).toEqual([]);
+    expect(state.count).toBe(2);
+    expect([...state.velocities]).toEqual(before);
+  });
+
+  it("elastic keeps both bodies", () => {
+    const state = headOn();
+    const events = resolveCollisions(state, "elastic");
+    expect(events).toEqual([]);
+    expect(state.count).toBe(2);
+  });
+
+  it("elastic conserves momentum", () => {
+    const state = headOn(1.3, 2);
+    const before = momentum(state);
+    resolveCollisions(state, "elastic");
+    const after = momentum(state);
+    expect(after.px).toBeCloseTo(before.px, 12);
+    expect(after.py).toBeCloseTo(before.py, 12);
+    expect(after.pz).toBeCloseTo(before.pz, 12);
+  });
+
+  it("elastic conserves kinetic energy", () => {
+    // This is what makes it elastic rather than merely momentum-conserving.
+    const state = headOn(1.3, 2);
+    const before = kinetic(state);
+    resolveCollisions(state, "elastic");
+    expect(kinetic(state)).toBeCloseTo(before, 12);
+  });
+
+  it("elastic conserves both for UNEQUAL masses too", () => {
+    const state = SimState.fromBodies([
+      {
+        id: "heavy",
+        name: "Heavy",
+        mass: 9,
+        radius: 1,
+        position: { x: -0.7, y: 0.2, z: 0 },
+        velocity: { x: 0.4, y: -0.1, z: 0.05 },
+      },
+      {
+        id: "light",
+        name: "Light",
+        mass: 0.5,
+        radius: 1,
+        position: { x: 0.7, y: -0.2, z: 0 },
+        velocity: { x: -0.9, y: 0.2, z: -0.05 },
+      },
+    ]);
+    const p0 = momentum(state);
+    const k0 = kinetic(state);
+    resolveCollisions(state, "elastic");
+    const p1 = momentum(state);
+    expect(p1.px).toBeCloseTo(p0.px, 12);
+    expect(p1.py).toBeCloseTo(p0.py, 12);
+    expect(p1.pz).toBeCloseTo(p0.pz, 12);
+    expect(kinetic(state)).toBeCloseTo(k0, 12);
+  });
+
+  it("elastic actually reverses the approach, it does not just leave them alone", () => {
+    const state = headOn();
+    resolveCollisions(state, "elastic");
+    // Equal masses head-on: velocities swap, so each reverses.
+    expect(state.velocities[0]).toBeCloseTo(-1, 12);
+    expect(state.velocities[3]).toBeCloseTo(1, 12);
+  });
+
+  it("elastic leaves a SEPARATING overlapping pair alone", () => {
+    // Without this, an overlap lasting several steps would be given the
+    // impulse again and again, and the pair would gain energy from nothing.
+    const state = headOn(-1); // already moving apart
+    const before = kinetic(state);
+    resolveCollisions(state, "elastic");
+    expect(kinetic(state)).toBeCloseTo(before, 12);
+    expect(state.velocities[0]).toBeCloseTo(-1, 12);
+  });
+
+  it("repeated elastic calls on an overlap do not pump energy in", () => {
+    const state = headOn();
+    const before = kinetic(state);
+    for (let i = 0; i < 25; i++) resolveCollisions(state, "elastic");
+    expect(kinetic(state)).toBeCloseTo(before, 10);
+  });
+
+  it("merge loses kinetic energy while elastic does not", () => {
+    const merged = headOn();
+    const before = kinetic(merged);
+    resolveCollisions(merged, "merge");
+    expect(merged.count).toBe(1);
+    // Head-on equal masses: everything cancels, so all of it is lost.
+    expect(kinetic(merged)).toBeLessThan(before);
+
+    const bounced = headOn();
+    resolveCollisions(bounced, "elastic");
+    expect(kinetic(bounced)).toBeCloseTo(before, 12);
+  });
+
+  it("defaults to merge, so existing callers are unchanged", () => {
+    const state = headOn();
+    resolveCollisions(state);
+    expect(state.count).toBe(1);
   });
 });

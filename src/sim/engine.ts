@@ -15,7 +15,11 @@
 import { SimState, type BodyInit } from "./state";
 import { computeAccelerations, type ForceMode, type ForceOptions } from "./forces";
 import { createIntegrator, type Integrator, type IntegratorName } from "./integrators";
-import { resolveCollisions, type CollisionEvent } from "./collisions";
+import {
+  resolveCollisions,
+  type CollisionEvent,
+  type CollisionMode,
+} from "./collisions";
 import { computeConservation, relativeDrift, type Conservation } from "./conservation";
 import { G_AU3_PER_MSUN_DAY2 } from "./constants";
 
@@ -58,7 +62,7 @@ export interface SimulationConfig {
   dt?: number;
   forceMode?: ForceMode | "auto";
   theta?: number;
-  collisionsEnabled?: boolean;
+  collisionMode?: CollisionMode;
 }
 
 export interface Diagnostics extends Conservation {
@@ -78,7 +82,7 @@ export class Simulation {
   simTime = 0;
   /** Total fixed steps taken. The authoritative clock for replay. */
   stepCount = 0;
-  collisionsEnabled: boolean;
+  collisionMode: CollisionMode;
 
   private accumulator = 0;
   private referenceEnergy = 0;
@@ -93,7 +97,7 @@ export class Simulation {
   constructor(config: SimulationConfig) {
     this.state = SimState.fromBodies(config.bodies);
     this.dt = config.dt ?? 0.01;
-    this.collisionsEnabled = config.collisionsEnabled ?? true;
+    this.collisionMode = config.collisionMode ?? "merge";
     this.requestedForceMode = config.forceMode ?? "auto";
     this.force = {
       g: config.g ?? G_AU3_PER_MSUN_DAY2,
@@ -171,8 +175,8 @@ export class Simulation {
       this.simTime += this.dt;
       this.stepCount++;
 
-      if (this.collisionsEnabled) {
-        const merged = resolveCollisions(this.state);
+      if (this.collisionMode !== "pass-through") {
+        const merged = resolveCollisions(this.state, this.collisionMode);
         if (merged.length > 0) {
           events.push(...merged);
           // Body count changed: the integrator's cached state and the force

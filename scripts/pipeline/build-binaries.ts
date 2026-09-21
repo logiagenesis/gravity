@@ -301,7 +301,7 @@ async function main(): Promise<void> {
         dt: round(row.periodDays / 400, 3),
         forceMode: "direct" as const,
         theta: 0.5,
-        collisions: true,
+        collisionMode: "merge",
       },
       bodies,
       camera: { distance: round(separation * 3.2, 3) },

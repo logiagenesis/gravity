@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "three-body-chaos",
   "name": "Three-Body Chaos",
   "summary": "Three equal masses at rest in a triangle. There is no closed-form solution, and the outcome is exquisitely sensitive to the starting conditions: usually two bodies pair up and the third is flung away.",
@@ -20,7 +20,7 @@
     "dt": 0.0005,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": true
+    "collisionMode": "merge"
   },
   "bodies": [
     {

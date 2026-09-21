@@ -150,7 +150,7 @@ describe("the produced state vectors actually orbit correctly", () => {
       integrator: "pefrl",
       dt: expected / 20000,
       forceMode: "direct",
-      collisionsEnabled: false,
+      collisionMode: "pass-through",
     });
 
     const angle = () =>

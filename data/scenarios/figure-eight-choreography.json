@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "figure-eight-choreography",
   "name": "The Figure-Eight Choreography",
   "summary": "Three equal masses chasing one another around a single figure-eight curve. A stable periodic solution to the three-body problem, found numerically in 1993 and proved to exist in 2000.",
@@ -21,7 +21,7 @@
     "dt": 0.0005,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": false
+    "collisionMode": "pass-through"
   },
   "bodies": [
     {

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "sun-and-earth",
   "name": "The Sun and the Earth",
   "summary": "The simplest real gravitational system: one star, one planet, one nearly circular orbit of 365 days. A good place to watch energy and angular momentum stay constant.",
@@ -20,7 +20,7 @@
     "dt": 0.5,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": true
+    "collisionMode": "merge"
   },
   "bodies": [
     {

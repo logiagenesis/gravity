@@ -134,9 +134,9 @@ describe("outbound commands", () => {
       { type: "setForceMode", mode: "barnes-hut" },
     ],
     [
-      "setCollisions",
-      (c) => c.setCollisions(false),
-      { type: "setCollisions", enabled: false },
+      "setCollisionMode",
+      (c) => c.setCollisionMode("elastic"),
+      { type: "setCollisionMode", mode: "elastic" },
     ],
   ];
 

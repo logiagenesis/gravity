@@ -168,7 +168,7 @@ function loadScenario(input: Scenario): void {
     dt: validated.physics.dt,
     forceMode: validated.physics.forceMode,
     theta: validated.physics.theta,
-    collisionsEnabled: validated.physics.collisions,
+    collisionMode: validated.physics.collisionMode,
   });
 
   topologyVersion++;
@@ -240,8 +240,8 @@ scope.addEventListener("message", (event: MessageEvent<MainToWorker>) => {
         simulation?.setSoftening(message.softening);
         break;
 
-      case "setCollisions":
-        if (simulation !== null) simulation.collisionsEnabled = message.enabled;
+      case "setCollisionMode":
+        if (simulation !== null) simulation.collisionMode = message.mode;
         break;
 
       case "requestSnapshot":

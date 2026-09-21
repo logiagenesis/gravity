@@ -7,6 +7,7 @@
  * anti-pattern that made the audited implementation slow
  * (artifacts/03-current-site-audit.md §5.1).
  */
+import type { CollisionMode } from "../sim/collisions";
 import type { BodyMeta, MainToWorker, SnapshotMessage, WorkerToMain } from "./protocol";
 import type { Scenario } from "../schema/scenario";
 
@@ -92,8 +93,8 @@ export class SimulationClient {
   setForceMode(mode: SnapshotMessage["forceMode"] | "auto"): void {
     this.send({ type: "setForceMode", mode });
   }
-  setCollisions(enabled: boolean): void {
-    this.send({ type: "setCollisions", enabled });
+  setCollisionMode(mode: CollisionMode): void {
+    this.send({ type: "setCollisionMode", mode });
   }
 
   /** Return a snapshot buffer for reuse. Call once the renderer has read it. */

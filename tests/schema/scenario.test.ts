@@ -47,7 +47,7 @@ const valid = () => ({
     dt: 0.01,
     forceMode: "direct",
     theta: 0.5,
-    collisions: true,
+    collisionMode: "merge",
   },
   bodies: [
     {

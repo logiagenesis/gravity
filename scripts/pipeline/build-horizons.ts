@@ -426,7 +426,7 @@ function buildScenario(spec: Spec, snapshot: Map<string, StateRow>): unknown {
       dt,
       forceMode: "direct" as const,
       theta: 0.5,
-      collisions: false,
+      collisionMode: "pass-through",
     },
     bodies,
     camera: {

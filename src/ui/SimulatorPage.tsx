@@ -21,6 +21,7 @@ import { CameraControls } from "../render/controls";
 import { SimulationClient } from "../worker/client";
 import type { BodyMeta, SnapshotMessage } from "../worker/protocol";
 import { INTEGRATOR_INFO, type IntegratorName } from "../sim/integrators";
+import { COLLISION_MODE_INFO, type CollisionMode } from "../sim/collisions";
 import { DAYS_PER_JULIAN_YEAR } from "../sim/constants";
 import type { Scenario } from "../schema/scenario";
 import { Tabs } from "./components/Tabs";
@@ -99,6 +100,9 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const [hud, setHud] = useState<SnapshotMessage | null>(null);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const [collisionMode, setCollisionMode] = useState<CollisionMode>(
+    scenario.physics.collisionMode,
+  );
   const [integrator, setIntegrator] = useState<IntegratorName>(
     scenario.physics.integrator,
   );
@@ -146,6 +150,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const panelId = useId();
   const frameId = useId();
   const scaleId = useId();
+  const collisionId = useId();
 
   // --- worker + renderer lifecycle ------------------------------------------
   useEffect(() => {
@@ -238,10 +243,14 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     sceneRef.current?.setFocus(focusIndex);
   }, [focusIndex]);
 
-  // A new scenario brings its own framing with it.
+  // A new scenario brings its own framing and its own contact mode with it.
   useEffect(() => {
     setFocusIndex(initialFocus);
   }, [initialFocus]);
+
+  useEffect(() => {
+    setCollisionMode(scenario.physics.collisionMode);
+  }, [scenario]);
 
   useEffect(() => {
     const spec: FrameSpec = { kind: frameKind, primaryIndex, secondaryIndex };
@@ -278,6 +287,13 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     setPlaying(false);
     setAnnounce("Advanced one step.");
   }, []);
+
+  const handleCollisionMode = (mode: CollisionMode) => {
+    setCollisionMode(mode);
+    clientRef.current?.setCollisionMode(mode);
+    const info = COLLISION_MODE_INFO.find((i) => i.mode === mode);
+    setAnnounce(`On contact: ${info?.label ?? mode}.`);
+  };
 
   const handleIntegrator = (name: IntegratorName) => {
     setIntegrator(name);
@@ -394,6 +410,10 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const integratorInfo = useMemo(
     () => INTEGRATOR_INFO.find((i) => i.name === integrator),
     [integrator],
+  );
+  const collisionInfo = useMemo(
+    () => COLLISION_MODE_INFO.find((i) => i.mode === collisionMode),
+    [collisionMode],
   );
   const positions = positionsRef.current;
 
@@ -568,6 +588,31 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         </div>
         <p className="field-hint" id="integrator-guidance">
           {integratorInfo?.guidance}
+        </p>
+      </div>
+
+      <div className="field">
+        <label htmlFor={collisionId}>On contact</label>
+        <div className="select">
+          <select
+            id={collisionId}
+            value={collisionMode}
+            onChange={(event) =>
+              handleCollisionMode(event.target.value as CollisionMode)
+            }
+            aria-describedby="collision-guidance"
+          >
+            {COLLISION_MODE_INFO.map((info) => (
+              <option key={info.mode} value={info.mode}>
+                {info.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {/* Each mode obeys a different conservation law, and the reader is
+            told which BEFORE they wonder why the energy readout jumped. */}
+        <p className="field-hint" id="collision-guidance">
+          {collisionInfo?.conserves}
         </p>
       </div>
 

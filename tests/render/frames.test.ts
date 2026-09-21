@@ -41,7 +41,7 @@ function run(spec: FrameSpec, steps: number, sampleEvery: number) {
     g: 1,
     dt: 1e-3,
     integrator: "verlet",
-    collisionsEnabled: false,
+    collisionMode: "pass-through",
   });
 
   const out = new Float32Array(sim.state.count * 3);

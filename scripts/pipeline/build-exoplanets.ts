@@ -485,7 +485,7 @@ async function main(): Promise<void> {
         dt,
         forceMode: "direct",
         theta: 0.5,
-        collisions: true,
+        collisionMode: "merge",
       },
       bodies,
       camera: {

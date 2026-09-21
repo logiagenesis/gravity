@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "earth-and-moon",
   "name": "The Earth and the Moon",
   "summary": "An unusually massive moon: at about 1/81 of the Earth's mass, it pulls the barycentre roughly three quarters of the way to the Earth's surface. Orbital period is about 27.3 days.",
@@ -20,7 +20,7 @@
     "dt": 0.005,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": true
+    "collisionMode": "merge"
   },
   "bodies": [
     {

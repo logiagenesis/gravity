@@ -184,7 +184,7 @@ const scenarios: ScenarioDoc[] = [];
       dt: 0.5,
       forceMode: "direct",
       theta: 0.5,
-      collisions: true,
+      collisionMode: "merge",
     },
     bodies,
     camera: { distance: 3, target: "sun" },
@@ -244,7 +244,7 @@ const scenarios: ScenarioDoc[] = [];
       dt: 0.25,
       forceMode: "direct",
       theta: 0.5,
-      collisions: true,
+      collisionMode: "merge",
     },
     bodies: toBarycentricFrame(raw),
     camera: { distance: 4, target: "sun" },
@@ -277,7 +277,7 @@ const scenarios: ScenarioDoc[] = [];
       dt: 2,
       forceMode: "direct",
       theta: 0.5,
-      collisions: true,
+      collisionMode: "merge",
     },
     bodies: toBarycentricFrame([
       {
@@ -341,7 +341,7 @@ const scenarios: ScenarioDoc[] = [];
       dt: 0.005,
       forceMode: "direct",
       theta: 0.5,
-      collisions: true,
+      collisionMode: "merge",
     },
     bodies: toBarycentricFrame([
       {
@@ -405,7 +405,7 @@ const scenarios: ScenarioDoc[] = [];
       dt: 0.0005,
       forceMode: "direct",
       theta: 0.5,
-      collisions: false,
+      collisionMode: "pass-through",
     },
     bodies: [
       {
@@ -519,7 +519,7 @@ const scenarios: ScenarioDoc[] = [];
       dt: 1,
       forceMode: "direct",
       theta: 0.5,
-      collisions: false,
+      collisionMode: "pass-through",
     },
     bodies: [
       {
@@ -577,7 +577,7 @@ const scenarios: ScenarioDoc[] = [];
       dt: 0.0005,
       forceMode: "direct",
       theta: 0.5,
-      collisions: true,
+      collisionMode: "merge",
     },
     bodies: [0, 1, 2].map((i) => {
       const t = (i * 2 * Math.PI) / 3;

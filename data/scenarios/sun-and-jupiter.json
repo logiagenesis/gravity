@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "sun-and-jupiter",
   "name": "The Sun and Jupiter",
   "summary": "Jupiter is about one thousandth of the Sun's mass, and it is enough to move the Sun. Watch the star wobble about the barycentre — the same signal used to detect exoplanets.",
@@ -20,7 +20,7 @@
     "dt": 2,
     "forceMode": "direct",
     "theta": 0.5,
-    "collisions": true
+    "collisionMode": "merge"
   },
   "bodies": [
     {
