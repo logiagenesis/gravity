@@ -1,22 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { openTab } from "./helpers";
 import { readFile } from "node:fs/promises";
-
-/**
- * Open a panel tab. The simulator now presents its controls in an overlay
- * panel rather than inline, so tests must open the relevant tab first. The
- * panel is open by default at desktop width.
- */
-async function openTab(page: Page, name: string) {
-  const tab = page.getByRole("tab", { name });
-  if (!(await tab.isVisible())) {
-    await page.getByRole("button", { name: /Show details panel/ }).click();
-  }
-  // Wait for the tab rather than clicking whatever is there: the panel can be
-  // mid-transition, and under a loaded suite that raced and timed out.
-  await expect(tab).toBeVisible();
-  await tab.click();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
-}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/#/scenario/sun-and-earth");
@@ -276,5 +260,24 @@ test.describe("simulator", () => {
     await expect(
       page.getByRole("img", { name: /Relative angular momentum error over time/ }),
     ).toBeVisible();
+  });
+
+  test("shows the z column only when something is out of the plane", async ({
+    page,
+  }) => {
+    // The panel is 392px wide at every viewport and five numeric columns do
+    // not fit, so a column of zeros used to cost the information in x and y.
+    await openTab(page, "Bodies");
+    await expect(page.getByRole("columnheader", { name: "z" })).toHaveCount(0);
+    await expect(page.getByText(/Every body is in the z = 0 plane/)).toBeVisible();
+
+    // The real ephemerides are not coplanar, and there it appears.
+    await page.goto("/#/scenario/solar-system-epoch");
+    // Wait for the simulator itself, not just the heading: the heading renders
+    // before the panel exists, and openTab then raced it.
+    await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
+    await openTab(page, "Bodies");
+    await expect(page.getByRole("columnheader", { name: "z" })).toBeVisible();
+    await expect(page.getByText(/Every body is in the z = 0 plane/)).toHaveCount(0);
   });
 });

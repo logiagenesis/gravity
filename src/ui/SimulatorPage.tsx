@@ -636,6 +636,18 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   );
   const positions = positionsRef.current;
 
+  /*
+   * Show the z column only when something is actually out of the plane.
+   *
+   * The panel is 392px wide at every viewport, and five numeric columns do not
+   * fit: z was clipped at the right edge. Most catalogue scenarios are
+   * coplanar by construction, so that clipped column was a column of zeros —
+   * it cost the information in x and y to show nothing. The real ephemerides
+   * from Horizons are not coplanar, and there it appears.
+   */
+  const hasOutOfPlane =
+    positions !== null && bodies.some((_, index) => positions[index * 3 + 2] !== 0);
+
   const timestepWarning = useMemo(() => {
     if (!hud) return null;
     if (hud.energyDrift > DRIFT_BAD) {
@@ -658,6 +670,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     <>
       <p className="source-note">
         A live, readable equivalent of the 3D view. Positions are in astronomical units.
+        {hasOutOfPlane ? "" : " Every body is in the z = 0 plane."}
       </p>
       <table className="diagnostics">
         <caption className="visually-hidden">
@@ -669,7 +682,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
             <th scope="col">Mass (M☉)</th>
             <th scope="col">x</th>
             <th scope="col">y</th>
-            <th scope="col">z</th>
+            {hasOutOfPlane && <th scope="col">z</th>}
           </tr>
         </thead>
         <tbody>
@@ -701,9 +714,11 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               <td className="value">
                 {positions ? formatScientific(positions[index * 3 + 1]) : "—"}
               </td>
-              <td className="value">
-                {positions ? formatScientific(positions[index * 3 + 2]) : "—"}
-              </td>
+              {hasOutOfPlane && (
+                <td className="value">
+                  {positions ? formatScientific(positions[index * 3 + 2]) : "—"}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

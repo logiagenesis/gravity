@@ -853,6 +853,16 @@ textarea {
     max-width: none;
     justify-content: center;
     bottom: calc(var(--s-2) + env(safe-area-inset-bottom, 0px));
+    /*
+     * Wrap rather than scroll. At 393px the row is about 40px too wide, and
+     * the speed select was the thing that gave way — it read "1)" with the
+     * rest of the label cut off. The clock moves to a second line instead.
+     */
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .sim__transport .select {
+    flex: 0 0 auto;
   }
   /* Sit exactly on top of the sheet when it is open. */
   .sim[data-panel="open"] .sim__transport {

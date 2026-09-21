@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { openTab } from "./helpers";
 
 /**
  * Editing a running simulation.
@@ -7,15 +8,6 @@ import { test, expect, type Page } from "@playwright/test";
  * is where the interesting failures are. The pure history bookkeeping is
  * covered in tests/ui/edit-history.test.ts.
  */
-async function openTab(page: Page, name: string) {
-  const tab = page.getByRole("tab", { name });
-  if (!(await tab.isVisible())) {
-    await page.getByRole("button", { name: /Show details panel/ }).click();
-  }
-  await expect(tab).toBeVisible();
-  await tab.click();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
-}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/#/scenario/inner-solar-system");
