@@ -15,6 +15,7 @@
 import { SimState, type BodyInit } from "./state";
 import { computeAccelerations, type ForceMode, type ForceOptions } from "./forces";
 import { createIntegrator, type Integrator, type IntegratorName } from "./integrators";
+import { chooseSubsteps, DEFAULT_ETA } from "./adaptive";
 import {
   resolveCollisions,
   type CollisionEvent,
@@ -63,6 +64,16 @@ export interface SimulationConfig {
   forceMode?: ForceMode | "auto";
   theta?: number;
   collisionMode?: CollisionMode;
+  /**
+   * Sub-divide an outer step when a close encounter needs it.
+   *
+   * On by default, because at the shipped timesteps a fixed step reaches a
+   * relative energy error above 1 — a failure, not a drift — the first time
+   * two bodies pass close (artifacts/12-adaptive-integrator-decision.md).
+   */
+  adaptive?: boolean;
+  /** Accuracy parameter for the sub-stepping criterion. Smaller is finer. */
+  eta?: number;
 }
 
 export interface Diagnostics extends Conservation {
@@ -83,6 +94,18 @@ export class Simulation {
   /** Total fixed steps taken. The authoritative clock for replay. */
   stepCount = 0;
   collisionMode: CollisionMode;
+  /** Sub-divide an outer step when a close encounter needs it. */
+  adaptive: boolean;
+  /** Accuracy parameter for the sub-stepping criterion. */
+  eta: number;
+  /**
+   * Substeps used by the most recent outer step. 1 means the fixed step was
+   * already fine enough. Surfaced in the HUD so the cost of an encounter is
+   * visible rather than felt only as a frame-rate drop.
+   */
+  lastSubsteps = 1;
+  /** Highest substep count used since the last reset. */
+  peakSubsteps = 1;
 
   private accumulator = 0;
   private referenceEnergy = 0;
@@ -98,6 +121,8 @@ export class Simulation {
     this.state = SimState.fromBodies(config.bodies);
     this.dt = config.dt ?? 0.01;
     this.collisionMode = config.collisionMode ?? "merge";
+    this.adaptive = config.adaptive ?? true;
+    this.eta = config.eta ?? DEFAULT_ETA;
     this.requestedForceMode = config.forceMode ?? "auto";
     this.force = {
       g: config.g ?? G_AU3_PER_MSUN_DAY2,
@@ -171,7 +196,25 @@ export class Simulation {
   stepFixed(n = 1): CollisionEvent[] {
     const events: CollisionEvent[] = [];
     for (let i = 0; i < n; i++) {
-      this.integratorImpl.step(this.state, this.dt, this.force);
+      /*
+       * The outer step is always exactly `this.dt`, so simulated time stays
+       * refresh-rate independent and replay stays deterministic. What changes
+       * is how finely it is cut up, and only while an encounter needs it.
+       */
+      const substeps = this.adaptive
+        ? chooseSubsteps(this.state, this.dt, this.eta)
+        : 1;
+      this.lastSubsteps = substeps;
+      if (substeps > this.peakSubsteps) this.peakSubsteps = substeps;
+
+      if (substeps === 1) {
+        this.integratorImpl.step(this.state, this.dt, this.force);
+      } else {
+        const h = this.dt / substeps;
+        for (let k = 0; k < substeps; k++) {
+          this.integratorImpl.step(this.state, h, this.force);
+        }
+      }
       this.simTime += this.dt;
       this.stepCount++;
 
@@ -253,8 +296,15 @@ export class Simulation {
     };
   }
 
-  /** Reset the conservation baseline to the current state. */
+  /**
+   * Reset the conservation baseline to the current state.
+   *
+   * The substep peak is cleared with it: both answer "how has it gone since
+   * the last time we started counting", and leaving a stale peak behind would
+   * report an encounter that is no longer part of the measurement.
+   */
   rebaseline(): void {
     this.captureReference();
+    this.peakSubsteps = 1;
   }
 }

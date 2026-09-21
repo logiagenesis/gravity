@@ -544,6 +544,16 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               <td className="value">{hud.baselineResets}</td>
             </tr>
           )}
+          {/* Shown only once it is doing something, so it reads as "an
+              encounter is happening" rather than as permanent clutter. */}
+          {hud !== null && hud.peakSubsteps > 1 && (
+            <tr>
+              <th scope="row">Substeps (now / peak)</th>
+              <td className="value">
+                {hud.lastSubsteps} / {hud.peakSubsteps}
+              </td>
+            </tr>
+          )}
           <tr>
             <th scope="row">Force method</th>
             <td className="value">{hud?.forceMode ?? "—"}</td>

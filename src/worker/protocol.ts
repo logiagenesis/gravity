@@ -63,6 +63,12 @@ export interface SnapshotMessage {
   angularMomentumDrift: number;
   /** Times the drift baseline was reset by a merge. */
   baselineResets: number;
+  /**
+   * Substeps used by the most recent outer step, and the most any step has
+   * needed since the last reset. 1 means the fixed step was already fine.
+   */
+  lastSubsteps: number;
+  peakSubsteps: number;
   kineticEnergy: number;
   potentialEnergy: number;
   integrator: IntegratorName;

@@ -573,6 +573,15 @@ const scenarios: ScenarioDoc[] = [];
     physics: {
       g: 1,
       softening: 0.01,
+      /*
+       * PEFRL rather than Verlet, and the choice is now measured rather than
+       * assumed. This scenario's bodies pass very close. Over 400 days at
+       * this timestep the relative energy error is 1.0e-6 with adaptive
+       * PEFRL and 3.5e-1 with adaptive Verlet, and Verlet does not reach
+       * PEFRL's accuracy at 250 times the work: its second-order truncation
+       * error is the limit, not the step size.
+       * See artifacts/12-adaptive-integrator-decision.md.
+       */
       integrator: "pefrl",
       dt: 0.0005,
       forceMode: "direct",
