@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      NOTE: no maximum-scale and no user-scalable=no. Restricting zoom fails
+      WCAG 2.2 SC 1.4.4 (Resize Text) and is a defect we specifically set out
+      not to repeat.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#070a12" />
+
+    <title>Gravity Simulator — interactive n-body orbital mechanics</title>
+    <meta
+      name="description"
+      content="An interactive 3D Newtonian n-body gravity simulator. Explore the solar system, three-body choreographies and Lagrange points, with cited data and visible conservation diagnostics."
+    />
+    <link rel="canonical" href="https://gravitysimulator.org/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Gravity Simulator" />
+    <meta
+      property="og:title"
+      content="Gravity Simulator — interactive n-body orbital mechanics"
+    />
+    <meta
+      property="og:description"
+      content="An interactive 3D Newtonian n-body gravity simulator with cited data and visible conservation diagnostics."
+    />
+    <meta property="og:url" content="https://gravitysimulator.org/" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "LearningResource",
+        "name": "Gravity Simulator",
+        "description": "An interactive 3D Newtonian n-body gravity simulator with cited data sources and visible energy and angular-momentum conservation diagnostics.",
+        "url": "https://gravitysimulator.org/",
+        "learningResourceType": "Simulation",
+        "educationalLevel": "Secondary and tertiary education",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "about": [
+          { "@type": "Thing", "name": "Orbital mechanics" },
+          { "@type": "Thing", "name": "N-body problem" },
+          { "@type": "Thing", "name": "Newtonian gravitation" }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <p
+        style="
+          padding: 2rem;
+          color: #eef2f8;
+          background: #070a12;
+          font-family: system-ui;
+        "
+      >
+        This gravity simulator needs JavaScript, because it runs a numerical physics
+        simulation in your browser. The scenario data and its sources are published as
+        JSON under <code>/scenarios/</code> if you would rather read the numbers
+        directly.
+      </p>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

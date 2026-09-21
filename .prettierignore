@@ -1,0 +1,8 @@
+dist
+node_modules
+.tsbuild
+coverage
+playwright-report
+test-results
+package-lock.json
+src/catalog/generated

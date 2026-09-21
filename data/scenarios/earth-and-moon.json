@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "id": "earth-and-moon",
+  "name": "The Earth and the Moon",
+  "summary": "An unusually massive moon: at about 1/81 of the Earth's mass, it pulls the barycentre roughly three quarters of the way to the Earth's surface. Orbital period is about 27.3 days.",
+  "category": "solar-system",
+  "tags": ["earth", "moon", "two-body", "barycentre", "tides"],
+  "difficulty": "beginner",
+  "source": {
+    "provider": "NASA NSSDCA Planetary Fact Sheet",
+    "reference": "Earth and Moon fact sheets (mass, radius, lunar orbit a and e)",
+    "retrievedAt": "2026-09-21",
+    "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html",
+    "notes": "Isolated two-body model: the Sun's influence is deliberately excluded so the Earth-Moon orbit can be studied on its own. Body radii are the true physical values; the renderer enforces a minimum on-screen size so small bodies stay visible without altering the physics."
+  },
+  "physics": {
+    "softening": 0,
+    "integrator": "verlet",
+    "dt": 0.005,
+    "forceMode": "direct",
+    "theta": 0.5,
+    "collisions": true
+  },
+  "bodies": [
+    {
+      "id": "earth",
+      "name": "Earth",
+      "mass": 0.0000030022630123208448,
+      "radius": 0.00004263496512454038,
+      "position": {
+        "x": -0.00002933634443496077,
+        "y": 0,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": -0.000007550104938897989,
+        "z": 0
+      },
+      "colour": "#6b93d6"
+    },
+    {
+      "id": "moon",
+      "name": "Moon",
+      "mass": 3.671108876037214e-8,
+      "radius": 0.000011618480877214785,
+      "position": {
+        "x": 0.0023991503599550107,
+        "y": 0,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0.0006174537874687807,
+        "z": 0
+      },
+      "colour": "#b8b8b8"
+    }
+  ],
+  "camera": {
+    "distance": 0.01,
+    "target": "earth"
+  }
+}

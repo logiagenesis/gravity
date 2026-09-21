@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "id": "figure-eight-choreography",
+  "name": "The Figure-Eight Choreography",
+  "summary": "Three equal masses chasing one another around a single figure-eight curve. A stable periodic solution to the three-body problem, found numerically in 1993 and proved to exist in 2000.",
+  "category": "choreographies",
+  "tags": ["three-body", "choreography", "periodic", "chaos", "famous"],
+  "difficulty": "advanced",
+  "source": {
+    "provider": "Chenciner & Montgomery (2000); Moore (1993)",
+    "reference": "Annals of Mathematics 152, 881-901 (existence proof); Phys. Rev. Lett. 70, 3675 (numerical discovery)",
+    "retrievedAt": "2026-09-21",
+    "url": "https://doi.org/10.2307/2661357",
+    "notes": "Dimensionless units with G = 1 and all three masses equal to 1. These are the standard published initial conditions for the figure-eight solution. Period is approximately 6.3259 time units."
+  },
+  "physics": {
+    "g": 1,
+    "softening": 0,
+    "integrator": "pefrl",
+    "dt": 0.0005,
+    "forceMode": "direct",
+    "theta": 0.5,
+    "collisions": false
+  },
+  "bodies": [
+    {
+      "id": "body-a",
+      "name": "Body A",
+      "mass": 1,
+      "radius": 0.03,
+      "position": {
+        "x": 0.97000436,
+        "y": -0.24308753,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0.466203685,
+        "y": 0.43236573,
+        "z": 0
+      },
+      "colour": "#ff6b6b"
+    },
+    {
+      "id": "body-b",
+      "name": "Body B",
+      "mass": 1,
+      "radius": 0.03,
+      "position": {
+        "x": -0.97000436,
+        "y": 0.24308753,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0.466203685,
+        "y": 0.43236573,
+        "z": 0
+      },
+      "colour": "#4ecdc4"
+    },
+    {
+      "id": "body-c",
+      "name": "Body C",
+      "mass": 1,
+      "radius": 0.03,
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "velocity": {
+        "x": -0.93240737,
+        "y": -0.86473146,
+        "z": 0
+      },
+      "colour": "#ffe66d"
+    }
+  ],
+  "camera": {
+    "distance": 3
+  }
+}
