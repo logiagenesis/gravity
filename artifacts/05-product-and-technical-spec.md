@@ -377,8 +377,17 @@ an enhancement."
 
 ## 11. Test strategy
 
-`npm run verify` runs, in order: **format → lint → typecheck → unit → build →
-e2e smoke**.
+`npm run verify` runs, in order: **generate catalogue → format check → lint →
+typecheck → dependency licence gate → unit tests → production build → browser
+and accessibility tests**.
+
+The catalogue generation step comes first because the manifest and search index
+are gitignored build artefacts that the app's TypeScript imports; without it,
+`verify` fails on a clean clone. CI caught exactly that.
+
+As built, this is **107 unit tests** (physics, schema, worker protocol, share
+links) and **33 browser tests** (flows, axe, keyboard-only, mobile,
+performance baseline).
 
 ### Physics regression tests (all mandated by the brief)
 
