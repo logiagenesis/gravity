@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "id": "sun-and-earth",
+  "name": "The Sun and the Earth",
+  "summary": "The simplest real gravitational system: one star, one planet, one nearly circular orbit of 365 days. A good place to watch energy and angular momentum stay constant.",
+  "category": "solar-system",
+  "tags": ["two-body", "earth", "sun", "circular", "beginner"],
+  "difficulty": "beginner",
+  "source": {
+    "provider": "NASA NSSDCA Planetary Fact Sheet; NASA JPL Solar System Dynamics",
+    "reference": "Planetary Fact Sheet (masses, radii); Approximate Positions of the Planets (a, e)",
+    "retrievedAt": "2026-09-21",
+    "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/",
+    "notes": "Idealised coplanar model. Each body starts at its own perihelion. Semi-major axis, eccentricity, mass and radius are from the cited sources; the orbital plane and each orbit's orientation angle are chosen for visual clarity. This is NOT an ephemeris and does not correspond to any real date."
+  },
+  "physics": {
+    "softening": 0,
+    "integrator": "verlet",
+    "dt": 0.5,
+    "forceMode": "direct",
+    "theta": 0.5,
+    "collisions": true
+  },
+  "bodies": [
+    {
+      "id": "sun",
+      "name": "Sun",
+      "mass": 1,
+      "radius": 0.18601869043848634,
+      "position": {
+        "x": -0.000002952090346608628,
+        "y": 0,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": -5.2515466690794365e-8,
+        "z": 0
+      },
+      "colour": "#ffd27f"
+    },
+    {
+      "id": "earth",
+      "name": "Earth",
+      "mass": 0.0000030022630123208448,
+      "radius": 0.001705398604981615,
+      "position": {
+        "x": 0.983288384293343,
+        "y": 0,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0.01749196072272104,
+        "z": 0
+      },
+      "colour": "#6b93d6"
+    }
+  ],
+  "camera": {
+    "distance": 3,
+    "target": "sun"
+  }
+}
