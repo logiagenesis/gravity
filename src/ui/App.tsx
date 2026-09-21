@@ -6,7 +6,7 @@
  * without a backend: the scenario payload rides in the fragment, which is never
  * transmitted to the server (see src/share/link.ts).
  */
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CataloguePage } from "./CataloguePage";
 /*
  * The simulator pulls in Three.js, which is by far the largest dependency.
@@ -116,11 +116,19 @@ export function App() {
     globalThis.location.hash = hash;
   }, []);
 
-  // Move focus to the heading on navigation, so keyboard and screen-reader
-  // users are not silently left at the top of a page they cannot tell changed.
+  // Move focus to main on NAVIGATION, so keyboard and screen-reader users are
+  // not silently left on a page they cannot tell changed.
+  //
+  // Deliberately skipped on first load: taking focus on mount would put it past
+  // the skip link, so the first Tab would no longer reach it. The skip link
+  // must be the first thing a keyboard user encounters.
+  const firstRender = useRef(true);
   useEffect(() => {
-    const main = document.getElementById("main");
-    if (main) main.focus({ preventScroll: true });
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    document.getElementById("main")?.focus({ preventScroll: true });
   }, [route]);
 
   const renderRoute = () => {

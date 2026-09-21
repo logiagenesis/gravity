@@ -216,6 +216,10 @@ textarea {
   font-weight: 600;
   color: var(--text-muted);
 }
+.field input {
+  max-width: 100%;
+  min-width: 0;
+}
 .field input[type="text"],
 .field input[type="search"],
 .field input[type="number"],
@@ -334,6 +338,18 @@ textarea {
   gap: 1rem;
   align-items: start;
 }
+
+/*
+ * Grid and flex items default to min-width: auto, so an item containing
+ * something wide (the canvas, a five-column table) refuses to shrink below its
+ * content and pushes the page sideways. Measured as 42px of horizontal overflow
+ * on a 393px viewport before this. min-width: 0 lets them shrink; the tables
+ * then scroll inside their own panel, which is where scrolling belongs.
+ */
+.sim-layout > *,
+.catalogue-layout > * {
+  min-width: 0;
+}
 @media (max-width: 950px) {
   .sim-layout {
     grid-template-columns: 1fr;
@@ -404,6 +420,16 @@ textarea {
 }
 
 /* ---------- diagnostics ---------- */
+
+/*
+ * Tables must scroll INSIDE their panel, never push the page sideways.
+ * The five-column body table overflowed a 393px viewport by 42px before this.
+ */
+[role="tabpanel"],
+.panel {
+  max-width: 100%;
+  overflow-x: auto;
+}
 
 .diagnostics {
   width: 100%;
