@@ -17,6 +17,7 @@ const SimulatorPage = lazy(() =>
   import("./SimulatorPage").then((m) => ({ default: m.SimulatorPage })),
 );
 import { SavedPage } from "./SavedPage";
+import { BuildPage } from "./BuildPage";
 import { AboutPage, PrivacyPage } from "./StaticPages";
 import { loadCatalogue } from "../catalog";
 import { decodeScenario, sharePayloadFromHash } from "../share/link";
@@ -30,6 +31,17 @@ type Route =
   | { kind: "saved" }
   | { kind: "savedScenario"; id: string }
   | { kind: "shared"; payload: string }
+  | { kind: "build" }
+  /**
+   * A scenario held in memory only: just built, or just imported from a file.
+   *
+   * There is nothing in the URL to resolve it from, which is exactly why it
+   * needs its own route. The import path used to reuse `shared` with an empty
+   * payload, so the resolver immediately tried to decode "" as a share link,
+   * failed, and replaced the freshly imported scenario with "this link is not
+   * in a format this version understands".
+   */
+  | { kind: "scratch" }
   | { kind: "about" }
   | { kind: "privacy" };
 
@@ -40,6 +52,8 @@ function parseHash(hash: string): Route {
   const path = hash.replace(/^#\/?/, "");
   if (path === "" || path === "scenarios") return { kind: "catalogue" };
   if (path === "saved") return { kind: "saved" };
+  if (path === "build") return { kind: "build" };
+  if (path === "scratch") return { kind: "scratch" };
   if (path === "about") return { kind: "about" };
   if (path === "privacy") return { kind: "privacy" };
 
@@ -85,6 +99,10 @@ export function App() {
     };
 
     setLoadError(null);
+    // A scratch scenario is already in hand and has nothing to resolve from.
+    // Falling through would clear it.
+    if (route.kind === "scratch") return;
+
     const needsScenario =
       route.kind === "scenario" ||
       route.kind === "savedScenario" ||
@@ -152,6 +170,14 @@ export function App() {
       );
     }
 
+    const simulator = scenario ? (
+      <Suspense fallback={<p role="status">Loading the simulator…</p>}>
+        <SimulatorPage scenario={scenario} onBack={() => navigate("#/")} />
+      </Suspense>
+    ) : (
+      <p role="status">Loading…</p>
+    );
+
     switch (route.kind) {
       case "catalogue":
         return <CataloguePage onOpen={(id) => navigate(`#/scenario/${id}`)} />;
@@ -168,22 +194,46 @@ export function App() {
             onOpen={(id) => navigate(`#/saved/${encodeURIComponent(id)}`)}
             onOpenImported={(imported) => {
               setScenario(imported);
-              setRoute({ kind: "shared", payload: "" });
+              navigate("#/scratch");
             }}
           />
         );
+      case "build":
+        return (
+          <BuildPage
+            onOpenSaved={(id) => navigate(`#/saved/${encodeURIComponent(id)}`)}
+            onOpenScratch={(built) => {
+              setScenario(built);
+              navigate("#/scratch");
+            }}
+          />
+        );
+      case "scratch":
+        // Reached directly, or after a reload, there is nothing to show: the
+        // scenario lived in memory. Say so rather than showing a blank page.
+        if (scenario === null) {
+          return (
+            <div className="notice" role="status">
+              <p>
+                <strong>Nothing to show here.</strong>
+              </p>
+              <p>
+                This address holds a scenario that was built or imported in this tab,
+                and it is not stored anywhere, so a reload loses it.
+              </p>
+              <button type="button" className="btn" onClick={() => navigate("#/build")}>
+                Build another
+              </button>
+            </div>
+          );
+        }
+        return simulator;
       case "about":
         return <AboutPage />;
       case "privacy":
         return <PrivacyPage />;
       default:
-        return scenario ? (
-          <Suspense fallback={<p role="status">Loading the simulator…</p>}>
-            <SimulatorPage scenario={scenario} onBack={() => navigate("#/")} />
-          </Suspense>
-        ) : (
-          <p role="status">Loading…</p>
-        );
+        return simulator;
     }
   };
 
@@ -191,7 +241,8 @@ export function App() {
   const immersive =
     route.kind === "scenario" ||
     route.kind === "savedScenario" ||
-    route.kind === "shared";
+    route.kind === "shared" ||
+    route.kind === "scratch";
 
   const navLink = (href: string, label: string, active: boolean) => (
     <li>
@@ -236,6 +287,7 @@ export function App() {
               "Scenarios",
               route.kind === "catalogue" || route.kind === "category",
             )}
+            {navLink("#/build", "Build", route.kind === "build")}
             {navLink("#/saved", "Saved", route.kind === "saved")}
             {navLink("#/about", "About", route.kind === "about")}
           </ul>

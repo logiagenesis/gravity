@@ -103,6 +103,16 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    name: "m5-desktop-build",
+    path: "#/build",
+    viewport: DESKTOP,
+  },
+  {
+    name: "m5-mobile-build",
+    path: "#/build",
+    viewport: MOBILE,
+  },
+  {
     name: "m5-desktop-level-explore",
     path: "#/scenario/inner-solar-system",
     viewport: DESKTOP,
