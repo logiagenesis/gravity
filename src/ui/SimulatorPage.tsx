@@ -22,6 +22,7 @@ import { SimulationClient } from "../worker/client";
 import type { BodyMeta, SnapshotMessage } from "../worker/protocol";
 import { INTEGRATOR_INFO, type IntegratorName } from "../sim/integrators";
 import { COLLISION_MODE_INFO, type CollisionMode } from "../sim/collisions";
+import { simulationWarnings } from "../sim/warnings";
 import { DAYS_PER_JULIAN_YEAR } from "../sim/constants";
 import type { Scenario } from "../schema/scenario";
 import { Tabs } from "./components/Tabs";
@@ -103,6 +104,18 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const [collisionMode, setCollisionMode] = useState<CollisionMode>(
     scenario.physics.collisionMode,
   );
+  /*
+   * Timestep and softening are held as TEXT while being typed.
+   *
+   * A number input bound to a number cannot hold "0.", "1e-" or an empty box,
+   * so typing a value mid-way through either snaps back or pushes a nonsense
+   * value into the engine on every keystroke. Text in, parsed out, and only a
+   * finite positive value is ever sent.
+   */
+  const [timestepText, setTimestepText] = useState(String(scenario.physics.dt));
+  const [softeningText, setSofteningText] = useState(
+    String(scenario.physics.softening),
+  );
   const [integrator, setIntegrator] = useState<IntegratorName>(
     scenario.physics.integrator,
   );
@@ -151,6 +164,8 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const frameId = useId();
   const scaleId = useId();
   const collisionId = useId();
+  const timestepId = useId();
+  const softeningId = useId();
 
   // --- worker + renderer lifecycle ------------------------------------------
   useEffect(() => {
@@ -250,6 +265,8 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
 
   useEffect(() => {
     setCollisionMode(scenario.physics.collisionMode);
+    setTimestepText(String(scenario.physics.dt));
+    setSofteningText(String(scenario.physics.softening));
   }, [scenario]);
 
   useEffect(() => {
@@ -287,6 +304,18 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     setPlaying(false);
     setAnnounce("Advanced one step.");
   }, []);
+
+  const handleTimestep = (text: string) => {
+    setTimestepText(text);
+    const value = Number(text);
+    if (Number.isFinite(value) && value > 0) clientRef.current?.setTimestep(value);
+  };
+
+  const handleSoftening = (text: string) => {
+    setSofteningText(text);
+    const value = Number(text);
+    if (Number.isFinite(value) && value >= 0) clientRef.current?.setSoftening(value);
+  };
 
   const handleCollisionMode = (mode: CollisionMode) => {
     setCollisionMode(mode);
@@ -411,6 +440,31 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     () => INTEGRATOR_INFO.find((i) => i.name === integrator),
     [integrator],
   );
+  /*
+   * Warnings about the run's own trustworthiness.
+   *
+   * Derived from the HUD snapshot rather than held in state, so they cannot
+   * go stale, and recomputed at the HUD's rate (a few times a second) rather
+   * than per frame.
+   */
+  const warnings = useMemo(
+    () =>
+      hud === null
+        ? []
+        : simulationWarnings({
+            integrator: hud.integrator,
+            dt: hud.dt,
+            shortestPeriodDays: hud.shortestPeriodDays,
+            softening: hud.softening,
+            closestApproachAu: hud.closestApproachAu,
+            theta: hud.theta,
+            peakSubsteps: hud.peakSubsteps,
+            stepCount: hud.stepCount,
+            energyDrift: hud.energyDrift,
+          }),
+    [hud],
+  );
+
   const collisionInfo = useMemo(
     () => COLLISION_MODE_INFO.find((i) => i.mode === collisionMode),
     [collisionMode],
@@ -494,6 +548,16 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
 
   const diagnosticsPanel = (
     <>
+      {warnings.length > 0 && (
+        <ul className="warnings" aria-label="Warnings about this simulation">
+          {warnings.map((warning) => (
+            <li key={warning.id} className={`warning warning--${warning.severity}`}>
+              <strong>{warning.title}</strong>
+              <span>{warning.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="source-note">
         In an exact integration these would never change, so the drift is a direct
         measure of how much to trust what you are watching.
@@ -623,6 +687,45 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
             told which BEFORE they wonder why the energy readout jumped. */}
         <p className="field-hint" id="collision-guidance">
           {collisionInfo?.conserves}
+        </p>
+      </div>
+
+      <div className="field">
+        <label htmlFor={timestepId}>Timestep (days)</label>
+        <input
+          id={timestepId}
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={timestepText}
+          onChange={(event) => handleTimestep(event.target.value)}
+          aria-describedby="timestep-hint"
+        />
+        <p className="field-hint" id="timestep-hint">
+          {hud !== null && hud.shortestPeriodDays !== null && hud.dt > 0
+            ? `${(hud.shortestPeriodDays / hud.dt).toFixed(0)} steps per orbit of the ` +
+              `fastest body. Below about 20, the shape of the orbit is not resolved.`
+            : "Smaller is more accurate and slower."}
+        </p>
+      </div>
+
+      <div className="field">
+        <label htmlFor={softeningId}>Softening (AU)</label>
+        <input
+          id={softeningId}
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={softeningText}
+          onChange={(event) => handleSoftening(event.target.value)}
+          aria-describedby="softening-hint"
+        />
+        <p className="field-hint" id="softening-hint">
+          Replaces the force at short range with a weaker, finite one, so two bodies
+          passing very close cannot produce an infinite acceleration. Zero is exact
+          Newtonian gravity.
         </p>
       </div>
 

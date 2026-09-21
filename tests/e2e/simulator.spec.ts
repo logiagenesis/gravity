@@ -212,4 +212,28 @@ test.describe("simulator", () => {
     await picker.selectOption("pass-through");
     await expect(page.getByText(/bodies fall through each other/)).toBeVisible();
   });
+
+  test("warns when the timestep cannot resolve the fastest orbit", async ({ page }) => {
+    // A simulator that quietly returns a smooth, wrong answer is worse than
+    // one that says it is struggling.
+    await openTab(page, "View");
+    const timestep = page.getByLabel(/Timestep/);
+    await timestep.fill("400");
+    await timestep.blur();
+
+    await openTab(page, "Diagnostics");
+    const warnings = page.getByRole("list", {
+      name: "Warnings about this simulation",
+    });
+    await expect(warnings.getByText(/steps per orbit/).first()).toBeVisible();
+    // And it says what to DO, not only that something is wrong.
+    await expect(warnings.getByText(/Reduce the timestep/)).toBeVisible();
+  });
+
+  test("shows no warnings on a healthy run", async ({ page }) => {
+    await openTab(page, "Diagnostics");
+    await expect(
+      page.getByRole("list", { name: "Warnings about this simulation" }),
+    ).toHaveCount(0);
+  });
 });

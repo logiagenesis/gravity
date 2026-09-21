@@ -1024,6 +1024,42 @@ textarea {
   color: var(--bad);
 }
 
+/* Warnings about the simulation's own trustworthiness. */
+.warnings {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.warning {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-3);
+  border: 1px solid var(--border-strong);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+}
+.warning strong {
+  color: var(--text);
+}
+.warning span {
+  color: var(--text-muted);
+}
+.warning--info {
+  border-left-color: var(--accent);
+}
+.warning--warn {
+  border-left-color: #e3b341;
+}
+.warning--error {
+  border-left-color: #f85149;
+}
+
 .notice {
   padding: var(--s-3);
   border-radius: var(--radius);

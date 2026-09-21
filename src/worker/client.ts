@@ -93,6 +93,9 @@ export class SimulationClient {
   setForceMode(mode: SnapshotMessage["forceMode"] | "auto"): void {
     this.send({ type: "setForceMode", mode });
   }
+  setSoftening(softening: number): void {
+    this.send({ type: "setSoftening", softening });
+  }
   setCollisionMode(mode: CollisionMode): void {
     this.send({ type: "setCollisionMode", mode });
   }

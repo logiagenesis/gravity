@@ -98,6 +98,12 @@ function sendSnapshot(): void {
     baselineResets: simulation.baselineResets,
     lastSubsteps: simulation.lastSubsteps,
     peakSubsteps: simulation.peakSubsteps,
+    closestApproachAu: Number.isFinite(simulation.closestApproach)
+      ? simulation.closestApproach
+      : null,
+    shortestPeriodDays: simulation.shortestPeriodDays,
+    softening: simulation.softening,
+    theta: simulation.forceMode === "barnes-hut" ? simulation.theta : null,
     kineticEnergy: d.kineticEnergy,
     potentialEnergy: d.potentialEnergy,
     integrator: simulation.integratorName,

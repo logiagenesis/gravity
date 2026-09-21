@@ -106,6 +106,16 @@ export class Simulation {
   lastSubsteps = 1;
   /** Highest substep count used since the last reset. */
   peakSubsteps = 1;
+  /**
+   * Closest any two bodies have come since the last reset, AU.
+   *
+   * Taken from the pairwise pass the sub-stepping criterion already makes, so
+   * it costs nothing. Infinity until two bodies have been compared, which is
+   * also the value for a single body.
+   */
+  closestApproach = Infinity;
+  /** Shortest two-body period present, days, or null if nothing is bound. */
+  shortestPeriodDays: number | null = null;
 
   private accumulator = 0;
   private referenceEnergy = 0;
@@ -146,6 +156,51 @@ export class Simulation {
     const c = computeConservation(this.state, this.force.g, this.force.softening);
     this.referenceEnergy = c.totalEnergy;
     this.referenceAngularMomentum = c.angularMomentum;
+    this.shortestPeriodDays = this.measureShortestPeriod();
+  }
+
+  /**
+   * Shortest two-body period currently in the system, days, or null if
+   * nothing is on a bound orbit.
+   *
+   * Computed at the same moments as the conservation baseline — on load, on
+   * rebaseline, and after a merge — rather than every step or every frame,
+   * because it is O(n^2) and at 5,000 bodies that is 25 million operations
+   * that would buy nothing: the shortest period does not change materially
+   * except when the body set does, and that is exactly when this reruns.
+   */
+  private measureShortestPeriod(): number | null {
+    const { positions, velocities, masses, count } = this.state;
+    if (count < 2) return null;
+    let shortest = Infinity;
+    for (let i = 0; i < count; i++) {
+      for (let j = i + 1; j < count; j++) {
+        const heavier = masses[i] >= masses[j] ? i : j;
+        const lighter = heavier === i ? j : i;
+        const h3 = heavier * 3;
+        const l3 = lighter * 3;
+        const r = Math.hypot(
+          positions[l3] - positions[h3],
+          positions[l3 + 1] - positions[h3 + 1],
+          positions[l3 + 2] - positions[h3 + 2],
+        );
+        if (r === 0) continue;
+        const v2 =
+          (velocities[l3] - velocities[h3]) ** 2 +
+          (velocities[l3 + 1] - velocities[h3 + 1]) ** 2 +
+          (velocities[l3 + 2] - velocities[h3 + 2]) ** 2;
+        const mu = this.force.g * (masses[heavier] + masses[lighter]);
+        if (mu <= 0) continue;
+        const energy = v2 / 2 - mu / r;
+        if (energy >= 0) continue; // unbound: no period
+        const a = -mu / (2 * energy);
+        const period = 2 * Math.PI * Math.sqrt((a * a * a) / mu);
+        if (Number.isFinite(period) && period > 0 && period < shortest) {
+          shortest = period;
+        }
+      }
+    }
+    return Number.isFinite(shortest) ? shortest : null;
   }
 
   get integratorName(): IntegratorName {
@@ -158,6 +213,18 @@ export class Simulation {
 
   get bodyCount(): number {
     return this.state.count;
+  }
+
+  /** Plummer softening length, AU. */
+  get softening(): number {
+    return this.force.softening;
+  }
+
+  /** Barnes-Hut opening angle. Only meaningful when forceMode is barnes-hut. */
+  get theta(): number {
+    // ForceOptions.theta is optional; the engine always supplies one in its
+    // constructor, so this default is a type formality rather than a fallback.
+    return this.force.theta ?? 0.5;
   }
 
   setIntegrator(name: IntegratorName): void {
@@ -201,9 +268,13 @@ export class Simulation {
        * refresh-rate independent and replay stays deterministic. What changes
        * is how finely it is cut up, and only while an encounter needs it.
        */
-      const substeps = this.adaptive
+      const decision = this.adaptive
         ? chooseSubsteps(this.state, this.dt, this.eta)
-        : 1;
+        : null;
+      const substeps = decision?.substeps ?? 1;
+      if (decision !== null && decision.minSeparation < this.closestApproach) {
+        this.closestApproach = decision.minSeparation;
+      }
       this.lastSubsteps = substeps;
       if (substeps > this.peakSubsteps) this.peakSubsteps = substeps;
 
@@ -306,5 +377,6 @@ export class Simulation {
   rebaseline(): void {
     this.captureReference();
     this.peakSubsteps = 1;
+    this.closestApproach = Infinity;
   }
 }

@@ -78,7 +78,7 @@ function integrate(
       // leaves populated for the PREVIOUS position. Refresh it so the
       // criterion sees the state it is actually judging.
       computeAccelerations(state, force);
-      const substeps = chooseSubsteps(state, dt, eta);
+      const { substeps } = chooseSubsteps(state, dt, eta);
       peakSubsteps = Math.max(peakSubsteps, substeps);
       totalSubsteps += substeps;
       const h = dt / substeps;

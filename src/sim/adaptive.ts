@@ -79,8 +79,20 @@ export const DEFAULT_ETA = 0.01;
  */
 export const MAX_SUBSTEPS = 1024;
 
+export interface SubstepDecision {
+  /** How many substeps this outer step needs. A power of two, at least 1. */
+  substeps: number;
+  /**
+   * Closest pair separation seen in this pass, AU, or Infinity if there is
+   * no pair. Returned because this pass already computes every pairwise
+   * distance, so taking the minimum here costs nothing, and a second O(n^2)
+   * loop elsewhere to find the same number would cost plenty.
+   */
+  minSeparation: number;
+}
+
 /**
- * How many substeps this outer step needs. Always a power of two, at least 1.
+ * Decide how finely to cut this outer step.
  *
  * `accelerations` must already hold the accelerations for the current
  * positions; the engine computes them as part of the previous step, so this
@@ -91,11 +103,12 @@ export function chooseSubsteps(
   dt: number,
   eta: number = DEFAULT_ETA,
   maxSubsteps: number = MAX_SUBSTEPS,
-): number {
+): SubstepDecision {
   const { positions, velocities, accelerations, count } = state;
-  if (count < 2 || dt <= 0) return 1;
+  if (count < 2 || dt <= 0) return { substeps: 1, minSeparation: Infinity };
 
   let shortest = Infinity;
+  let minSeparation = Infinity;
 
   for (let i = 0; i < count; i++) {
     const i3 = i * 3;
@@ -106,6 +119,7 @@ export function chooseSubsteps(
       const dz = positions[j3 + 2] - positions[i3 + 2];
       const r = Math.hypot(dx, dy, dz);
       if (r === 0 || !Number.isFinite(r)) continue;
+      if (r < minSeparation) minSeparation = r;
 
       const dvx = velocities[j3] - velocities[i3];
       const dvy = velocities[j3 + 1] - velocities[i3 + 1];
@@ -124,10 +138,12 @@ export function chooseSubsteps(
     }
   }
 
-  if (!Number.isFinite(shortest) || shortest <= 0) return 1;
+  if (!Number.isFinite(shortest) || shortest <= 0) {
+    return { substeps: 1, minSeparation };
+  }
 
   const allowed = eta * shortest;
-  if (dt <= allowed) return 1;
+  if (dt <= allowed) return { substeps: 1, minSeparation };
 
   // Round the ratio UP to a power of two, so the substep length only ever
   // halves. Powers of two keep the substep an exact binary fraction of dt,
@@ -135,5 +151,8 @@ export function chooseSubsteps(
   const needed = dt / allowed;
   const exponent = Math.ceil(Math.log2(needed));
   const substeps = Math.pow(2, Math.min(exponent, Math.log2(maxSubsteps)));
-  return Math.min(maxSubsteps, Math.max(1, substeps));
+  return {
+    substeps: Math.min(maxSubsteps, Math.max(1, substeps)),
+    minSeparation,
+  };
 }

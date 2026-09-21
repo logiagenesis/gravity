@@ -69,6 +69,14 @@ export interface SnapshotMessage {
    */
   lastSubsteps: number;
   peakSubsteps: number;
+  /** Closest any two bodies have come since the last reset, AU. */
+  closestApproachAu: number | null;
+  /** Shortest two-body period present, days, or null if nothing is bound. */
+  shortestPeriodDays: number | null;
+  /** Plummer softening length, AU. */
+  softening: number;
+  /** Barnes-Hut opening angle, or null when the force method is direct. */
+  theta: number | null;
   kineticEnergy: number;
   potentialEnergy: number;
   integrator: IntegratorName;

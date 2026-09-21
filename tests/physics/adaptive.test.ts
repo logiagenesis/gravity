@@ -12,7 +12,14 @@
  *   - a quiet system pays nothing
  */
 import { describe, it, expect } from "vitest";
-import { chooseSubsteps, DEFAULT_ETA, MAX_SUBSTEPS } from "../../src/sim/adaptive";
+import {
+  chooseSubsteps as decide,
+  DEFAULT_ETA,
+  MAX_SUBSTEPS,
+} from "../../src/sim/adaptive";
+
+/** The substep count alone, which is what most of these assert on. */
+const chooseSubsteps = (...args: Parameters<typeof decide>) => decide(...args).substeps;
 import { SimState, type BodyInit } from "../../src/sim/state";
 import { computeAccelerations } from "../../src/sim/forces";
 import { Simulation } from "../../src/sim/engine";
@@ -215,5 +222,28 @@ describe("the engine's outer step stays fixed", () => {
     const fixed = measure(false);
     const adaptive = measure(true);
     expect(adaptive).toBeLessThan(fixed / 100);
+  });
+});
+
+describe("the closest-pair separation it reports", () => {
+  it("is the real minimum, taken from the pass it already makes", () => {
+    // Free because the criterion walks every pair anyway; a second O(n^2)
+    // loop elsewhere to find the same number would not be.
+    const state = pair(0.25);
+    expect(decide(state, 1).minSeparation).toBeCloseTo(0.25, 12);
+  });
+
+  it("is Infinity when there is no pair to measure", () => {
+    const single = SimState.fromBodies([
+      {
+        id: "a",
+        name: "A",
+        mass: 1,
+        radius: 1,
+        position: { x: 0, y: 0, z: 0 },
+        velocity: { x: 0, y: 0, z: 0 },
+      },
+    ]);
+    expect(decide(single, 1).minSeparation).toBe(Infinity);
   });
 });
