@@ -44,27 +44,26 @@ it affects how the audit evidence was obtained.
 
 ## Commit log
 
-| #   | SHA             | Change                                                                                               | Checks run                                           | Result |
-| --- | --------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------ |
-| 1   | `d412819`       | Working log with verified environment baseline                                                       | `git status`, `git diff --check`                     | pass   |
-| 2   | `55657d8`       | `01-questions-and-answers.md` — 76 questions, 15 categories, per-answer confidence                   | manual source verification                           | pass   |
-| 3   | `03408c0`       | `02-top-20-benchmark.md` — 20 companies/products + non-company leaders                               | web research with citations                          | pass   |
-| 4   | `5297b3c`       | `03-current-site-audit.md` — 22 findings by severity                                                 | repo inspection, live fetches, **executed probes**   | pass   |
-| 5   | `910ad34`       | `04-licensing-and-clean-room.md` — clean-room decision                                               | `find` for licence files, `grep` package.json        | pass   |
-| 6   | `a35e855`       | `05-product-and-technical-spec.md` — build blueprint                                                 | traceability table vs all 22 findings                | pass   |
-| 7   | `a8a6bca`       | Scaffold: React 19 + TS + Vite, ESLint, Prettier, Vitest, Playwright, CI, licence gate               | `npm audit` → 0 vulns; licence gate pass             | pass   |
-| 8   | `5d5131f`       | Physics core: SoA state, forces, Barnes-Hut, Verlet/PEFRL/RK4, collisions, conservation, accumulator | 29 physics tests, lint, typecheck                    | pass   |
-| 9   | `f7bbf67`       | Scenario schema, migrations, generator, 7 cited scenarios                                            | 79 tests total                                       | pass   |
-| 10  | `737d2cf`       | Worker, renderer, UI, search, persistence, sharing, headers, sitemap                                 | typecheck, 79 tests, build                           | pass   |
-| 11  | `82b37e9`       | 32 Playwright tests: browser, axe, keyboard, mobile                                                  | full `npm run verify`                                | pass   |
-| 12  | `b0df49c`       | Performance baseline; corrected BH threshold; fixed drift after merges                               | benchmark + 33 e2e + 80 unit                         | pass   |
-| 13  | `18b8b7b`       | Working log completed                                                                                | `npm run verify`                                     | pass   |
-| 14  | `7948c50`       | **Render fix**: separated display size from physical radius; `07-manual-qa.md` + screenshots         | `npm run verify`, manual QA                          | pass   |
-| 15  | `6d104fa`       | **CI fix**: generate catalogue before typecheck                                                      | reproduced failure, then verified from a clean state | pass   |
-| 16  | `cb2ee84`       | Worker protocol tests (18)                                                                           | `npm run verify`                                     | pass   |
-| 17  | `c2eba61`       | Share-link tests (9)                                                                                 | `npm run verify`                                     | pass   |
-| 18  | `f64c822`       | README test-suite table                                                                              | `npm run verify`                                     | pass   |
-| 13  | _(this commit)_ | Working log completed; `06-performance-baseline.md` recorded                                         | `npm run verify`                                     | pass   |
+| #   | SHA       | Change                                                                                               | Checks run                                           | Result |
+| --- | --------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------ |
+| 1   | `d412819` | Working log with verified environment baseline                                                       | `git status`, `git diff --check`                     | pass   |
+| 2   | `55657d8` | `01-questions-and-answers.md` — 76 questions, 15 categories, per-answer confidence                   | manual source verification                           | pass   |
+| 3   | `03408c0` | `02-top-20-benchmark.md` — 20 companies/products + non-company leaders                               | web research with citations                          | pass   |
+| 4   | `5297b3c` | `03-current-site-audit.md` — 22 findings by severity                                                 | repo inspection, live fetches, **executed probes**   | pass   |
+| 5   | `910ad34` | `04-licensing-and-clean-room.md` — clean-room decision                                               | `find` for licence files, `grep` package.json        | pass   |
+| 6   | `a35e855` | `05-product-and-technical-spec.md` — build blueprint                                                 | traceability table vs all 22 findings                | pass   |
+| 7   | `a8a6bca` | Scaffold: React 19 + TS + Vite, ESLint, Prettier, Vitest, Playwright, CI, licence gate               | `npm audit` → 0 vulns; licence gate pass             | pass   |
+| 8   | `5d5131f` | Physics core: SoA state, forces, Barnes-Hut, Verlet/PEFRL/RK4, collisions, conservation, accumulator | 29 physics tests, lint, typecheck                    | pass   |
+| 9   | `f7bbf67` | Scenario schema, migrations, generator, 7 cited scenarios                                            | 79 tests total                                       | pass   |
+| 10  | `737d2cf` | Worker, renderer, UI, search, persistence, sharing, headers, sitemap                                 | typecheck, 79 tests, build                           | pass   |
+| 11  | `82b37e9` | 32 Playwright tests: browser, axe, keyboard, mobile                                                  | full `npm run verify`                                | pass   |
+| 12  | `b0df49c` | Performance baseline; corrected BH threshold; fixed drift after merges                               | benchmark + 33 e2e + 80 unit                         | pass   |
+| 13  | `18b8b7b` | Working log completed                                                                                | `npm run verify`                                     | pass   |
+| 14  | `7948c50` | **Render fix**: separated display size from physical radius; `07-manual-qa.md` + screenshots         | `npm run verify`, manual QA                          | pass   |
+| 15  | `6d104fa` | **CI fix**: generate catalogue before typecheck                                                      | reproduced failure, then verified from a clean state | pass   |
+| 16  | `cb2ee84` | Worker protocol tests (18)                                                                           | `npm run verify`                                     | pass   |
+| 17  | `c2eba61` | Share-link tests (9)                                                                                 | `npm run verify`                                     | pass   |
+| 18  | `f64c822` | README test-suite table                                                                              | `npm run verify`                                     | pass   |
 
 ---
 
