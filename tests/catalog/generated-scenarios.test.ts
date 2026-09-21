@@ -196,8 +196,15 @@ describe("the generated catalogue", () => {
   it("starts every system close to rest in its own centre-of-momentum frame", () => {
     // A system with net momentum drifts out of frame while it runs, which
     // looks like a bug to the viewer even though the physics is fine.
+    //
+    // The Horizons scenarios are DELIBERATELY exempt: their frame is the
+    // solar-system barycentre, the Sun's motion about it is a real effect
+    // those scenarios exist to show, and re-centring a subset of the Solar
+    // System would be wrong anyway because the momentum of the bodies left
+    // out is not zero.
     const drifting: string[] = [];
     for (const { file, scenario } of scenarios) {
+      if (scenario.source.provider === "NASA JPL Horizons") continue;
       let px = 0;
       let py = 0;
       let pz = 0;
@@ -534,3 +541,115 @@ function measureOrbitalPeriod(
   }
   return null;
 }
+
+/**
+ * Independent cross-check of the JPL Horizons ingestion.
+ *
+ * The state vectors and the orbital periods below come from DIFFERENT NASA
+ * sources — Horizons for the vectors, the NSSDCA Planetary Fact Sheet for the
+ * periods — so agreement between them is real evidence that the snapshot was
+ * transcribed correctly, in the right units and the right columns. A swapped
+ * column, a km/AU slip or a per-second/per-day slip would all show up here as
+ * an enormous error rather than a percent.
+ */
+describe("Horizons state vectors against published orbital periods", () => {
+  /** Days. NASA NSSDCA Planetary Fact Sheet, page last updated 18 March 2025. */
+  const FACT_SHEET_PERIOD_DAYS: Record<string, number> = {
+    Mercury: 88.0,
+    Venus: 224.7,
+    Earth: 365.2,
+    Mars: 687.0,
+    Jupiter: 4331,
+    Saturn: 10_747,
+    Uranus: 30_589,
+    Neptune: 59_800,
+  };
+
+  it("reproduces every planet's published period about the Sun", () => {
+    const entry = scenarios.find(
+      ({ scenario }) => scenario.id === "solar-system-epoch",
+    );
+    expect(
+      entry,
+      "solar-system-epoch is missing; run npm run data:build",
+    ).toBeDefined();
+    const scenario = (entry as { scenario: Scenario }).scenario;
+    const g = scenario.physics.g ?? G_AU3_PER_MSUN_DAY2;
+    const sun = scenario.bodies.reduce((a, b) => (b.mass > a.mass ? b : a));
+
+    const bad: string[] = [];
+    let checked = 0;
+    for (const body of scenario.bodies) {
+      const expected = FACT_SHEET_PERIOD_DAYS[body.name];
+      if (expected === undefined) continue;
+      const actual = twoBodyPeriodDays(sun, body, g);
+      expect(actual, `${body.name} is not bound to the Sun`).not.toBeNull();
+      checked++;
+      const relative = Math.abs((actual as number) - expected) / expected;
+      // The fact sheet quotes a MEAN period; this is the osculating period at
+      // one instant, and the two differ most for the outer planets, whose
+      // orbits are the most perturbed relative to their own slow mean motion.
+      // Measured worst case is Uranus at 1.11%, so 1.5% is the honest bound.
+      if (relative > 0.015) {
+        bad.push(
+          `${body.name}: ${(actual as number).toFixed(1)} d vs published ` +
+            `${expected} d (${(relative * 100).toFixed(2)}%)`,
+        );
+      }
+    }
+    expect(bad).toEqual([]);
+    expect(checked).toBe(Object.keys(FACT_SHEET_PERIOD_DAYS).length);
+  });
+
+  it("puts the Moon on its real orbit about the Earth", () => {
+    const entry = scenarios.find(({ scenario }) => scenario.id === "jwst-at-l2");
+    expect(entry).toBeDefined();
+    const scenario = (entry as { scenario: Scenario }).scenario;
+    const earth = scenario.bodies.find((b) => b.name === "Earth");
+    const moon = scenario.bodies.find((b) => b.name === "Moon");
+    expect(earth).toBeDefined();
+    expect(moon).toBeDefined();
+
+    const g = scenario.physics.g ?? G_AU3_PER_MSUN_DAY2;
+    const period = twoBodyPeriodDays(
+      earth as Scenario["bodies"][number],
+      moon as Scenario["bodies"][number],
+      g,
+    );
+    expect(period).not.toBeNull();
+    // Fact sheet: 27.3 days.
+    expect(Math.abs((period as number) - 27.3) / 27.3).toBeLessThan(0.015);
+
+    // And at a real distance: perigee 363,300 km to apogee 405,500 km, which
+    // is 0.00243 to 0.00271 AU. Anything outside that is a units error.
+    const separation = Math.hypot(
+      (moon as Scenario["bodies"][number]).position.x -
+        (earth as Scenario["bodies"][number]).position.x,
+      (moon as Scenario["bodies"][number]).position.y -
+        (earth as Scenario["bodies"][number]).position.y,
+      (moon as Scenario["bodies"][number]).position.z -
+        (earth as Scenario["bodies"][number]).position.z,
+    );
+    expect(separation).toBeGreaterThan(0.0023);
+    expect(separation).toBeLessThan(0.0028);
+  });
+
+  it("has every spacecraft on an escape trajectory where it should be", () => {
+    const g = G_AU3_PER_MSUN_DAY2;
+    for (const id of [
+      "voyager-1-interstellar",
+      "voyager-2-interstellar",
+      "new-horizons-beyond-pluto",
+    ]) {
+      const entry = scenarios.find(({ scenario }) => scenario.id === id);
+      expect(entry, `${id} is missing`).toBeDefined();
+      const scenario = (entry as { scenario: Scenario }).scenario;
+      const sun = scenario.bodies.reduce((a, b) => (b.mass > a.mass ? b : a));
+      const craft = scenario.bodies.filter((b) => b.massless === true);
+      expect(craft).toHaveLength(1);
+      // All three are on hyperbolic, Sun-escaping paths, so a bound orbit here
+      // would mean the velocity was ingested wrongly.
+      expect(twoBodyPeriodDays(sun, craft[0], g)).toBeNull();
+    }
+  });
+});

@@ -165,4 +165,29 @@ test.describe("simulator", () => {
       page.getByRole("heading", { name: "The Sun and the Earth" }),
     ).toBeVisible();
   });
+
+  test("a scenario's own camera target is honoured on load", async ({ page }) => {
+    // `camera.target` was in the schema and validated against the body ids
+    // from the start, but nothing read it, so every scenario opened framed on
+    // the origin. "Webb at L2" made that obvious: it opened looking at the Sun
+    // from 0.05 AU away.
+    await page.goto("/#/scenario/jwst-at-l2");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Webb");
+    await openTab(page, "Bodies");
+    await expect(
+      page.getByRole("button", { name: "Earth", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    // And nothing else is being followed.
+    await expect(
+      page.getByRole("button", { name: "Sun", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("a scenario without a camera target follows nothing", async ({ page }) => {
+    await page.goto("/#/scenario/figure-eight-choreography");
+    await openTab(page, "Bodies");
+    await expect(
+      page.getByRole("button", { name: "Body A", exact: true }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
 });

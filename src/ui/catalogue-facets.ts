@@ -78,6 +78,14 @@ export const CATEGORY_COPY: Record<string, { title: string; blurb: string }> = {
       "one another around a single closed path. Initial conditions come from the " +
       "papers that found them.",
   },
+  spaceflight: {
+    title: "Spaceflight",
+    blurb:
+      "Real spacecraft at their real positions, from the JPL Horizons ephemeris " +
+      "at a recorded epoch. Each one is a massless test particle: it feels the " +
+      "Sun and the planets but exerts no gravity of its own, which at these mass " +
+      "ratios is the honest simplification rather than a shortcut.",
+  },
   "what-if": {
     title: "What if?",
     blurb:

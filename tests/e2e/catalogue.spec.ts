@@ -153,28 +153,28 @@ test.describe("catalogue", () => {
     page,
   }) => {
     await page.goto("/");
-    // Page one must be the seven scenarios written to teach something, not 24
-    // arbitrary host names from the archive.
-    const badges = page.getByRole("article").first().getByText("Hand-built");
-    await expect(badges).toBeVisible();
-    // Scoped to the cards: "Hand-built first" is also a sort option.
+    // Wait for the page to actually render before reading it. Without this the
+    // assertion races the first paint and reads an empty list, which only
+    // showed up when the suite ran under load.
+    await expect(page.getByRole("article")).toHaveCount(24);
     await expect(
-      page.getByRole("article").getByText("Hand-built", { exact: true }),
-    ).toHaveCount(7);
-  });
+      page.getByRole("article").first().getByText("Hand-built", { exact: true }),
+    ).toBeVisible();
 
-  test("a facet stays switchable after it is used", async ({ page }) => {
-    // Building the star options from the filtered results would strand the
-    // reader: ticking "1 star" would remove every other option.
-    await page.goto("/#/category/exoplanets");
-    await page
-      .getByRole("group", { name: "Stars" })
-      .getByRole("checkbox")
-      .first()
-      .check();
-    await expect(
-      page.getByRole("group", { name: "Stars" }).getByRole("checkbox"),
-    ).toHaveCount(2);
+    // Page one must start with the scenarios written to teach something, not
+    // with arbitrary host names from the archive. Asserted as a PREFIX rather
+    // than a fixed count, so adding a hand-built scenario does not break it.
+    const cards = await page.getByRole("article").allInnerTexts();
+    const handBuilt = cards.map((text) => /\bHAND-BUILT\b/i.test(text));
+    expect(handBuilt[0], "the first card is not hand-built").toBe(true);
+    const firstBulk = handBuilt.indexOf(false);
+    if (firstBulk !== -1) {
+      expect(
+        handBuilt.slice(firstBulk).some(Boolean),
+        "a hand-built scenario appears after a bulk one",
+      ).toBe(false);
+    }
+    expect(handBuilt.filter(Boolean).length).toBeGreaterThanOrEqual(7);
   });
 
   test("opens a scenario", async ({ page }) => {

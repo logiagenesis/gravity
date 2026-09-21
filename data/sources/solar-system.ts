@@ -117,6 +117,85 @@ export const MOON = {
   colour: "#b8b8b8",
 };
 
+/**
+ * Physical data for every body the Horizons pipeline places.
+ *
+ * Masses and diameters transcribed from [FACT] (page last updated
+ * 18 March 2025); radii are the tabulated diameters halved. No orbital
+ * elements here: those scenarios take their state vectors from JPL Horizons
+ * at a recorded epoch, so an element set would be a second, conflicting
+ * source for the same thing.
+ *
+ * Spacecraft are massless test particles. Their `radiusKm` is a DISPLAY size
+ * chosen so they are visible at solar-system scale, not a physical dimension,
+ * and each generated scenario says so in its citation.
+ */
+export interface BodyPhysical {
+  name: string;
+  /** Mass in 1e24 kg. [FACT]. Zero for a massless test particle. */
+  massE24Kg: number;
+  /** Radius in km. [FACT] (diameter / 2), or a display size for spacecraft. */
+  radiusKm: number;
+  colour: string;
+  /** True when radiusKm is a display size rather than a measurement. */
+  displayRadiusOnly?: boolean;
+}
+
+/** Keyed by JPL Horizons body id, as it appears in the snapshot. */
+export const HORIZONS_BODIES: Readonly<Record<string, BodyPhysical>> = {
+  "10": {
+    name: "Sun",
+    massE24Kg: SOLAR_MASS_1E24_KG,
+    radiusKm: 695_700,
+    colour: "#ffd27f",
+  },
+  "199": { name: "Mercury", massE24Kg: 0.33, radiusKm: 2439.7, colour: "#9b8f84" },
+  "299": { name: "Venus", massE24Kg: 4.87, radiusKm: 6051.8, colour: "#e6c88a" },
+  "399": { name: "Earth", massE24Kg: 5.97, radiusKm: 6378.1, colour: "#6b93d6" },
+  "301": { name: "Moon", massE24Kg: 0.073, radiusKm: 1737.5, colour: "#b8b8b8" },
+  "499": { name: "Mars", massE24Kg: 0.642, radiusKm: 3396.2, colour: "#c1440e" },
+  "599": { name: "Jupiter", massE24Kg: 1898, radiusKm: 71_492, colour: "#d8ca9d" },
+  "699": { name: "Saturn", massE24Kg: 568, radiusKm: 60_268, colour: "#e3d6a3" },
+  "799": { name: "Uranus", massE24Kg: 86.8, radiusKm: 25_559, colour: "#a7dbe6" },
+  "899": { name: "Neptune", massE24Kg: 102, radiusKm: 24_764, colour: "#5b7ff5" },
+  "999": { name: "Pluto", massE24Kg: 0.013, radiusKm: 1188, colour: "#cbbfae" },
+  "-31": {
+    name: "Voyager 1",
+    massE24Kg: 0,
+    radiusKm: 120_000,
+    colour: "#7ee787",
+    displayRadiusOnly: true,
+  },
+  "-32": {
+    name: "Voyager 2",
+    massE24Kg: 0,
+    radiusKm: 120_000,
+    colour: "#79c0ff",
+    displayRadiusOnly: true,
+  },
+  "-98": {
+    name: "New Horizons",
+    massE24Kg: 0,
+    radiusKm: 90_000,
+    colour: "#ffa657",
+    displayRadiusOnly: true,
+  },
+  "-96": {
+    name: "Parker Solar Probe",
+    massE24Kg: 0,
+    radiusKm: 9_000,
+    colour: "#ff7b72",
+    displayRadiusOnly: true,
+  },
+  "-170": {
+    name: "James Webb Space Telescope",
+    massE24Kg: 0,
+    radiusKm: 4_000,
+    colour: "#d2a8ff",
+    displayRadiusOnly: true,
+  },
+};
+
 /** Convert a mass in 1e24 kg to solar masses. */
 export const toSolarMasses = (massE24Kg: number): number =>
   massE24Kg / SOLAR_MASS_1E24_KG;

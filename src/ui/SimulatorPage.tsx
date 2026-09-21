@@ -64,12 +64,21 @@ function driftClass(drift: number): string {
   return "drift-good";
 }
 
+/**
+ * Compact fixed-width-ish number for the body table.
+ *
+ * Four significant figures. The table has five columns in a panel that is
+ * about 390px wide on a phone, and at five decimal places the last column was
+ * being clipped in the M4 screenshot. Four figures is more than the eye can
+ * use from a live readout and is honest about the precision anyone can
+ * actually read off a running simulation.
+ */
 function formatScientific(value: number): string {
   if (!Number.isFinite(value)) return "—";
   if (value === 0) return "0";
   return Math.abs(value) < 1e-3 || Math.abs(value) >= 1e5
-    ? value.toExponential(3)
-    : value.toFixed(5);
+    ? value.toExponential(2)
+    : value.toFixed(4);
 }
 
 interface SimulatorPageProps {
@@ -110,7 +119,23 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const [frameKind, setFrameKind] = useState<FrameKind>("inertial");
   const [primaryIndex, setPrimaryIndex] = useState(0);
   const [secondaryIndex, setSecondaryIndex] = useState(1);
-  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  /*
+   * The scenario's own camera target, resolved to a body index.
+   *
+   * `camera.target` has been in the schema (and validated against the body
+   * ids) since the beginning, but nothing ever read it: the camera always
+   * framed the origin. That was invisible while every scenario was centred on
+   * its own primary, and obvious the moment the Horizons scenarios arrived —
+   * "Webb at L2" opened looking at the Sun from 0.05 AU away.
+   */
+  const initialFocus = useMemo(() => {
+    const target = scenario.camera?.target;
+    if (target === undefined) return null;
+    const index = scenario.bodies.findIndex((body) => body.id === target);
+    return index >= 0 ? index : null;
+  }, [scenario]);
+
+  const [focusIndex, setFocusIndex] = useState<number | null>(initialFocus);
   const [showLabels, setShowLabels] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [showBarycentre, setShowBarycentre] = useState(false);
@@ -212,6 +237,11 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   useEffect(() => {
     sceneRef.current?.setFocus(focusIndex);
   }, [focusIndex]);
+
+  // A new scenario brings its own framing with it.
+  useEffect(() => {
+    setFocusIndex(initialFocus);
+  }, [initialFocus]);
 
   useEffect(() => {
     const spec: FrameSpec = { kind: frameKind, primaryIndex, secondaryIndex };

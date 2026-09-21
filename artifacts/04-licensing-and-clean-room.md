@@ -298,10 +298,42 @@ completeness.
 | **What we ingest** | Numerical parameters only (masses, radii, semi-major axes, eccentricities)                               |
 | **Verdict**        | ✅ Usable with attribution, which every scenario carries                                                 |
 
+### NASA JPL Horizons on-line ephemeris system (API)
+
+| Field                       | Value                                                                                                                                                                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source URL**              | https://ssd.jpl.nasa.gov/api/horizons.api (documented at https://ssd-api.jpl.nasa.gov/doc/horizons.html)                                                                                                                    |
+| **Operator**                | Solar System Dynamics Group, Jet Propulsion Laboratory / Caltech, under contract with NASA                                                                                                                                  |
+| **Terms**                   | JPL Image Use Policy, checked 21/09/2026: material on public `jpl.nasa.gov` sites "may be used for any purpose without prior permission", subject to a credit line and to not claiming or implying endorsement              |
+| **Required credit**         | "Courtesy NASA/JPL-Caltech"                                                                                                                                                                                                 |
+| **Restrictions that apply** | No claim or implication of NASA/JPL/Caltech endorsement. The NASA insignia, logotype and seal need prior written approval and are **not used**. The identifiable-person and third-party-copyright cases concern images only |
+| **Date checked**            | 21/09/2026                                                                                                                                                                                                                  |
+| **What we ingest**          | Numerical state vectors only (position and velocity, AU and AU/day, ecliptic J2000, solar-system barycentre), at one recorded epoch. **No prose, no images, no logos.**                                                     |
+| **Ephemeris source**        | DE441, as reported by Horizons in each response header and recorded in the snapshot                                                                                                                                         |
+| **Verdict**                 | ✅ **Usable.** Numerical facts are not copyrightable, and the policy permits use with credit. The credit is carried in each generated scenario's `source` block, so it travels with the data                                |
+
+**Access note.** Unlike the Exoplanet Archive, Horizons is reachable from this
+session through the Firecrawl MCP tool. It is still read into a **committed
+snapshot** rather than queried at build time: CI has no outbound access, a
+build that depends on a live third-party service is a build that breaks when
+that service does, and an ephemeris is only meaningful with its epoch pinned.
+
+### Prior-art screenshot held for comparison
+
+| Field              | Value                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **File**           | `artifacts/screenshots/prior-art/gravitysimulator-org-exoplanets-1440x900.png`                                                                               |
+| **Source URL**     | https://gravitysimulator.org/exoplanets                                                                                                                      |
+| **Captured**       | 21/09/2026, at 1440×900, via the Firecrawl MCP tool                                                                                                          |
+| **Why it is here** | Rule 5 of the remediation brief requires the equivalent view on the original to be captured and committed alongside ours for each of M3, M4 and M5           |
+| **How it is used** | Comparison and critique only, inside `artifacts/`. It is **not** used in the product, **not** served by it, and no part of it is reproduced in any asset     |
+| **Clean-room**     | Unaffected. Looking at a competitor's page to assess it is not copying it. No code, asset, scenario file, shader or text from that site enters this codebase |
+| **Verdict**        | ✅ Held as evidence in a private repository for the owner's own comparison, which is what the owner asked for                                                |
+
 ### Sources considered and NOT used
 
-| Source                                        | Why not                                                                                                                                                                                       |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| JPL Horizons spacecraft ephemerides           | Would enable a Spaceflight category. **Not yet evaluated** — its access route and terms need the same check as the rows above before any use. Recorded as pending rather than quietly skipped |
-| Planetary surface textures (NASA/JPL imagery) | Not needed: M3 renders procedural surfaces in-shader, which avoids the download cost and the per-image licensing check entirely                                                               |
-| Any Harmony of the Spheres scenario JSON      | Clean-room rule. Their files are not ours to copy, and the same primary sources are directly available                                                                                        |
+| Source                                        | Why not                                                                                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| ~~JPL Horizons spacecraft ephemerides~~       | **Now evaluated and used** — see the Horizons row above. Moved out of this table                                                |
+| Planetary surface textures (NASA/JPL imagery) | Not needed: M3 renders procedural surfaces in-shader, which avoids the download cost and the per-image licensing check entirely |
+| Any Harmony of the Spheres scenario JSON      | Clean-room rule. Their files are not ours to copy, and the same primary sources are directly available                          |

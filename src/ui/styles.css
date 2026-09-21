@@ -961,12 +961,26 @@ textarea {
 [role="tabpanel"] {
   max-width: 100%;
   overflow-x: auto;
+  /* A clipped column must read as "scroll me", not as "broken". Overlay
+     scrollbars hide themselves until you touch them, so the bar is made
+     permanent and given contrast against the panel. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+[role="tabpanel"]::-webkit-scrollbar {
+  height: 8px;
+}
+[role="tabpanel"]::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
 }
 
 .diagnostics {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-sm);
+  /* Digits of equal width, so a column of numbers reads as a column. */
+  font-variant-numeric: tabular-nums;
 }
 .diagnostics th,
 .diagnostics td {
@@ -975,10 +989,16 @@ textarea {
   border-bottom: 1px solid var(--border);
   vertical-align: baseline;
 }
-/* Body names should not wrap mid-word and squeeze the numbers. */
+/*
+ * Body names should not squeeze the numbers, but they must not push them off
+ * the panel either: "James Webb Space Telescope (test particle)" on one
+ * unbreakable line drove every numeric column out of view in the M4
+ * screenshot. Wrap between words, never inside one.
+ */
 .diagnostics th[scope="row"] {
-  white-space: nowrap;
   padding-right: var(--s-2);
+  max-width: 20ch;
+  overflow-wrap: break-word;
 }
 .diagnostics thead th {
   font-size: var(--fs-xs);
