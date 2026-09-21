@@ -23,6 +23,7 @@ import type { BodyMeta, SnapshotMessage } from "../worker/protocol";
 import { INTEGRATOR_INFO, type IntegratorName } from "../sim/integrators";
 import { COLLISION_MODE_INFO, type CollisionMode } from "../sim/collisions";
 import { simulationWarnings } from "../sim/warnings";
+import { DriftChart, type DriftSample } from "./components/DriftChart";
 import { DAYS_PER_JULIAN_YEAR } from "../sim/constants";
 import type { Scenario } from "../schema/scenario";
 import { Tabs } from "./components/Tabs";
@@ -88,6 +89,19 @@ interface SimulatorPageProps {
   onBack: () => void;
 }
 
+/** Rolling window of drift samples. Old samples fall off the front. */
+const DRIFT_HISTORY_LENGTH = 180;
+
+function appendSample(
+  history: readonly DriftSample[],
+  sample: DriftSample,
+): DriftSample[] {
+  const next = [...history, sample];
+  return next.length > DRIFT_HISTORY_LENGTH
+    ? next.slice(next.length - DRIFT_HISTORY_LENGTH)
+    : next;
+}
+
 export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
@@ -99,6 +113,17 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
 
   const [bodies, setBodies] = useState<BodyMeta[]>([]);
   const [hud, setHud] = useState<SnapshotMessage | null>(null);
+  /**
+   * Rolling history of the conservation errors.
+   *
+   * Sampled at the HUD's rate, not per frame: the point is a trend over
+   * minutes, and 60 Hz would fill the buffer in four seconds while making the
+   * line noisier rather than more informative.
+   */
+  const [driftHistory, setDriftHistory] = useState<{
+    energy: DriftSample[];
+    angular: DriftSample[];
+  }>({ energy: [], angular: [] });
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [collisionMode, setCollisionMode] = useState<CollisionMode>(
@@ -227,12 +252,43 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   }, [scenario]);
 
   useEffect(() => {
+    let lastResets = 0;
+    let lastStep = -1;
     const timer = setInterval(() => {
-      if (latestRef.current) setHud(latestRef.current);
+      const snapshot = latestRef.current;
+      if (snapshot) {
+        setHud(snapshot);
+        // Only record when the simulation has actually advanced, so a paused
+        // run does not scroll a flat line across the chart and push the
+        // interesting history off the end.
+        if (snapshot.stepCount !== lastStep) {
+          const rebaselined = snapshot.baselineResets > lastResets;
+          lastResets = snapshot.baselineResets;
+          lastStep = snapshot.stepCount;
+          setDriftHistory((history) => ({
+            energy: appendSample(history.energy, {
+              simDays: snapshot.simTimeDays,
+              value: snapshot.energyDrift,
+              rebaselined,
+            }),
+            angular: appendSample(history.angular, {
+              simDays: snapshot.simTimeDays,
+              value: snapshot.angularMomentumDrift,
+              rebaselined,
+            }),
+          }));
+        }
+      }
       if (sceneRef.current) setFrameMs(sceneRef.current.frameMs);
     }, HUD_INTERVAL_MS);
     return () => clearInterval(timer);
   }, []);
+
+  // A reset or a new scenario starts a new history; keeping the old one would
+  // draw a trend across two different runs.
+  useEffect(() => {
+    setDriftHistory({ energy: [], angular: [] });
+  }, [scenario]);
 
   useEffect(() => {
     sceneRef.current?.setTrailsEnabled(showTrails);
@@ -577,6 +633,25 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
 
   const diagnosticsPanel = (
     <>
+      <div className="drift-charts">
+        <DriftChart
+          samples={driftHistory.energy}
+          label="Energy error"
+          summary={
+            `Relative energy error over time, on a logarithmic scale from 1e-16 to 1. ` +
+            `Currently ${hud ? hud.energyDrift.toExponential(1) : "unknown"}.`
+          }
+        />
+        <DriftChart
+          samples={driftHistory.angular}
+          label="Angular momentum error"
+          summary={
+            `Relative angular momentum error over time, on a logarithmic scale from ` +
+            `1e-16 to 1. Currently ` +
+            `${hud ? hud.angularMomentumDrift.toExponential(1) : "unknown"}.`
+          }
+        />
+      </div>
       {warnings.length > 0 && (
         <ul className="warnings" aria-label="Warnings about this simulation">
           {warnings.map((warning) => (

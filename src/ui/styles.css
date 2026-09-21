@@ -1024,6 +1024,70 @@ textarea {
   color: var(--bad);
 }
 
+/* Rolling conservation-error charts. Plain SVG; see components/DriftChart. */
+.drift-charts {
+  display: grid;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.drift-chart {
+  margin: 0;
+}
+.drift-chart figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-2);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--s-1);
+}
+.drift-chart__now {
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.drift-chart svg {
+  display: block;
+  width: 100%;
+  height: 54px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.drift-chart__grid {
+  stroke: var(--border);
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+.drift-chart__reset {
+  stroke: #e3b341;
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+.drift-chart__line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.drift-chart__scale {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.drift-chart--empty .field-hint {
+  padding: var(--s-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
 /* Warnings about the simulation's own trustworthiness. */
 .warnings {
   list-style: none;

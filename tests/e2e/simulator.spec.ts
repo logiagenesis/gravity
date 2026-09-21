@@ -257,4 +257,24 @@ test.describe("simulator", () => {
     );
     expect(bytes.byteLength).toBeGreaterThan(5000);
   });
+
+  test("charts the conservation errors over time", async ({ page }) => {
+    await openTab(page, "Diagnostics");
+    // Before anything has run there is nothing to plot, and it says so rather
+    // than drawing an empty box.
+    await expect(
+      page.getByText("Press play to start recording.").first(),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Play" }).click();
+    const chart = page.getByRole("img", { name: /Relative energy error over time/ });
+    await expect(chart).toBeVisible({ timeout: 10_000 });
+    // The label carries the current value, so the chart is readable without
+    // being able to see the shape.
+    await expect(chart).toHaveAttribute("aria-label", /Currently \d/);
+
+    await expect(
+      page.getByRole("img", { name: /Relative angular momentum error over time/ }),
+    ).toBeVisible();
+  });
 });
