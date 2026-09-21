@@ -60,6 +60,8 @@ export interface SnapshotMessage {
   energyDrift: number;
   angularMomentum: number;
   angularMomentumDrift: number;
+  /** Times the drift baseline was reset by a merge. */
+  baselineResets: number;
   kineticEnergy: number;
   potentialEnergy: number;
   integrator: IntegratorName;

@@ -95,6 +95,7 @@ function sendSnapshot(): void {
     energyDrift: d.energyDrift,
     angularMomentum: d.angularMomentum,
     angularMomentumDrift: d.angularMomentumDrift,
+    baselineResets: simulation.baselineResets,
     kineticEnergy: d.kineticEnergy,
     potentialEnergy: d.potentialEnergy,
     integrator: simulation.integratorName,

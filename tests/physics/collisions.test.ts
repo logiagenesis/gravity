@@ -160,3 +160,47 @@ describe("collision merge", () => {
     expect(state.count).toBe(2);
   });
 });
+
+describe("conservation baseline after a merge", () => {
+  it("re-baselines, because a merge legitimately changes total energy", async () => {
+    const { Simulation } = await import("../../src/sim/engine");
+
+    // Two bodies on a collision course.
+    const sim = new Simulation({
+      bodies: [
+        {
+          id: "a",
+          name: "A",
+          mass: 1,
+          radius: 0.2,
+          position: { x: -0.5, y: 0, z: 0 },
+          velocity: { x: 0.5, y: 0, z: 0 },
+        },
+        {
+          id: "b",
+          name: "B",
+          mass: 1,
+          radius: 0.2,
+          position: { x: 0.5, y: 0, z: 0 },
+          velocity: { x: -0.5, y: 0, z: 0 },
+        },
+      ],
+      g: 1,
+      dt: 1e-3,
+      integrator: "verlet",
+      collisionsEnabled: true,
+    });
+
+    expect(sim.baselineResets).toBe(0);
+    sim.stepFixed(2000);
+
+    // They must actually have merged, or this test proves nothing.
+    expect(sim.state.count).toBe(1);
+    expect(sim.baselineResets).toBeGreaterThan(0);
+
+    // Drift is now measured from AFTER the merge, so it must be small rather
+    // than reporting the inelastic energy loss as numerical failure. A run of
+    // the three-body scenario reported 100% "drift" before this was fixed.
+    expect(sim.diagnostics().energyDrift).toBeLessThan(1e-6);
+  });
+});

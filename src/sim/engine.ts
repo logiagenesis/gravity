@@ -29,8 +29,23 @@ export const MAX_FRAME_SECONDS = 0.25;
 /** Hard ceiling on steps per advance, so one call can never block the worker. */
 export const MAX_STEPS_PER_ADVANCE = 20_000;
 
-/** Body count above which Barnes-Hut is chosen in "auto" mode. */
-export const AUTO_BARNES_HUT_THRESHOLD = 512;
+/**
+ * Body count above which Barnes-Hut is chosen in "auto" mode.
+ *
+ * MEASURED, not assumed. `scripts/benchmark-forces.ts` on Node v22.22.2,
+ * Intel Xeon @ 2.10 GHz, theta = 0.5:
+ *
+ *   n=256   direct 0.327 ms   BH 0.721 ms   0.45x
+ *   n=512   direct 1.584 ms   BH 1.932 ms   0.82x   <- BH still SLOWER
+ *   n=1024  direct 5.118 ms   BH 5.035 ms   1.02x   <- crossover
+ *   n=2048  direct 19.94 ms   BH 13.13 ms   1.52x
+ *   n=4096  direct 80.01 ms   BH 32.31 ms   2.48x
+ *
+ * An earlier guess of 512 would have selected Barnes-Hut where it is 22%
+ * slower AND approximate — worse on both counts. Re-run the benchmark if the
+ * force or tree code changes materially.
+ */
+export const AUTO_BARNES_HUT_THRESHOLD = 1024;
 
 export interface SimulationConfig {
   bodies: readonly BodyInit[];
@@ -68,6 +83,12 @@ export class Simulation {
   private accumulator = 0;
   private referenceEnergy = 0;
   private referenceAngularMomentum = 0;
+  /**
+   * How many times the conservation baseline has been reset by a merge. Shown
+   * in the HUD so a small drift figure after a collision is not mistaken for
+   * an integration that has been accurate the whole way through.
+   */
+  baselineResets = 0;
 
   constructor(config: SimulationConfig) {
     this.state = SimState.fromBodies(config.bodies);
@@ -159,6 +180,14 @@ export class Simulation {
           this.integratorImpl.reset();
           this.force.mode = this.resolveForceMode();
           computeAccelerations(this.state, this.force);
+
+          // A merge is perfectly inelastic, so it LEGITIMATELY changes total
+          // energy. Measuring drift against a pre-merge reference would report
+          // a physical event as numerical failure — a baseline run of the
+          // three-body scenario showed 100% "drift" that was entirely a merge.
+          // Re-baseline, and record that we did, so the HUD can say why.
+          this.captureReference();
+          this.baselineResets++;
         }
       }
     }

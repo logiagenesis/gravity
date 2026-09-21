@@ -354,6 +354,14 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         Conservation diagnostics. In an exact integration these would never change, so
         the drift is a direct measure of how much to trust what you are watching.
       </p>
+      {hud !== null && hud.baselineResets > 0 && (
+        <p className="source-note">
+          The baseline has been reset {hud.baselineResets}{" "}
+          {hud.baselineResets === 1 ? "time" : "times"} because bodies merged. A merge
+          is perfectly inelastic, so it changes the total energy for real — the drift
+          below is measured since the most recent merge, not since the start.
+        </p>
+      )}
       <table className="diagnostics">
         <tbody>
           <tr>
@@ -386,6 +394,12 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               {hud ? hud.angularMomentumDrift.toExponential(2) : "—"}
             </td>
           </tr>
+          {hud !== null && hud.baselineResets > 0 && (
+            <tr>
+              <th scope="row">Baseline resets</th>
+              <td className="value">{hud.baselineResets}</td>
+            </tr>
+          )}
           <tr>
             <th scope="row">Force method</th>
             <td className="value">{hud?.forceMode ?? "—"}</td>
