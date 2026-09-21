@@ -17,6 +17,11 @@ import { computeAccelerations, type ForceMode, type ForceOptions } from "./force
 import { createIntegrator, type Integrator, type IntegratorName } from "./integrators";
 import { chooseSubsteps, DEFAULT_ETA } from "./adaptive";
 import {
+  applyEdit as applyEditToState,
+  type EditResult,
+  type ScenarioEdit,
+} from "./edits";
+import {
   resolveCollisions,
   type CollisionEvent,
   type CollisionMode,
@@ -116,6 +121,13 @@ export class Simulation {
   closestApproach = Infinity;
   /** Shortest two-body period present, days, or null if nothing is bound. */
   shortestPeriodDays: number | null = null;
+  /**
+   * Edits applied to this run. Surfaced so a reader can tell the difference
+   * between the scenario as published and the scenario as they have changed
+   * it — an edited run is still a real simulation, but it is no longer the
+   * one the citation describes.
+   */
+  editCount = 0;
 
   private accumulator = 0;
   private referenceEnergy = 0;
@@ -365,6 +377,30 @@ export class Simulation {
         this.referenceAngularMomentum,
       ),
     };
+  }
+
+  /**
+   * Apply an edit to the live simulation and return its exact inverse.
+   *
+   * Every edit legitimately changes the conserved quantities — adding a body
+   * adds its energy, changing a mass changes the potential — so the baseline
+   * is recaptured afterwards. Without that, the drift readout would report the
+   * edit itself as integration error and the number would stop meaning
+   * anything. The integrator's cached state is discarded for the same reason:
+   * it describes a system that no longer exists.
+   *
+   * Throws EditError, having changed nothing, if the edit is invalid.
+   */
+  applyEdit(edit: ScenarioEdit): EditResult {
+    // The edit is sized against the force field's own g, not the module
+    // default, so a scenario that overrides g gets orbits that match it.
+    const result = applyEditToState(this.state, edit, this.force.g);
+    this.integratorImpl.reset();
+    this.force.mode = this.resolveForceMode();
+    computeAccelerations(this.state, this.force);
+    this.captureReference();
+    this.editCount++;
+    return result;
   }
 
   /**

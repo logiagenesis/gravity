@@ -96,6 +96,7 @@ function sendSnapshot(): void {
     angularMomentum: d.angularMomentum,
     angularMomentumDrift: d.angularMomentumDrift,
     baselineResets: simulation.baselineResets,
+    editCount: simulation.editCount,
     lastSubsteps: simulation.lastSubsteps,
     peakSubsteps: simulation.peakSubsteps,
     closestApproachAu: Number.isFinite(simulation.closestApproach)
@@ -251,6 +252,64 @@ scope.addEventListener("message", (event: MessageEvent<MainToWorker>) => {
       case "setCollisionMode":
         if (simulation !== null) simulation.collisionMode = message.mode;
         break;
+
+      case "applyEdit": {
+        if (simulation === null) break;
+        try {
+          const { inverse, applied } = simulation.applyEdit(message.edit);
+          // The body set may have changed, so the renderer needs new metadata
+          // and a new topology version before the next snapshot arrives.
+          topologyVersion++;
+          post({
+            type: "editApplied",
+            requestId: message.requestId,
+            bodies: bodyMeta(simulation),
+            topologyVersion,
+            inverse,
+            applied,
+          });
+          sendSnapshot();
+        } catch (error) {
+          post({
+            type: "editRejected",
+            requestId: message.requestId,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+        break;
+      }
+
+      case "requestBodyDetail": {
+        let body = null;
+        if (simulation !== null) {
+          const state = simulation.state;
+          for (let i = 0; i < state.count; i++) {
+            if (state.ids[i] !== message.id) continue;
+            const k = i * 3;
+            body = {
+              id: state.ids[i],
+              name: state.names[i],
+              mass: state.masses[i],
+              radius: state.radii[i],
+              position: {
+                x: state.positions[k],
+                y: state.positions[k + 1],
+                z: state.positions[k + 2],
+              },
+              velocity: {
+                x: state.velocities[k],
+                y: state.velocities[k + 1],
+                z: state.velocities[k + 2],
+              },
+              massless: state.isMassless(i),
+              colour: state.colours[i],
+            };
+            break;
+          }
+        }
+        post({ type: "bodyDetail", requestId: message.requestId, body });
+        break;
+      }
 
       case "requestSnapshot":
         sendSnapshot();

@@ -87,6 +87,7 @@ function snapshot(overrides: Partial<SnapshotMessage> = {}): SnapshotMessage {
     angularMomentum: 2,
     angularMomentumDrift: 1e-12,
     baselineResets: 0,
+    editCount: 0,
     lastSubsteps: 1,
     peakSubsteps: 1,
     closestApproachAu: null,

@@ -918,25 +918,21 @@ textarea {
   margin-bottom: var(--s-3);
 }
 
+/*
+ * Tabs WRAP rather than scroll.
+ *
+ * They used to scroll horizontally behind a fading right edge, which was fine
+ * at five tabs and stopped being fine at six: in the details panel, which is
+ * about 390px wide at every viewport, "Share" was clipped to a single letter
+ * and a first-time visitor had no reason to think anything was there. A second
+ * row costs one line of height and hides nothing.
+ */
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   border-bottom: 1px solid var(--border);
   margin-bottom: var(--s-3);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.tabs::-webkit-scrollbar {
-  display: none;
-}
-/* Fade the right edge so a clipped tab reads as "scroll me", not "broken". */
-.tabs {
-  -webkit-mask-image: linear-gradient(
-    to right,
-    #000 calc(100% - 24px),
-    transparent 100%
-  );
-  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
 }
 .tab {
   min-height: var(--tap);
@@ -1277,4 +1273,116 @@ kbd {
 }
 .diagnostics tr[data-focused="true"] {
   background: rgb(124 196 255 / 0.08);
+}
+
+/* -------------------------------------------------------------------------
+   Body editor
+
+   Lives inside the details panel, which is narrow on desktop and full-width
+   on mobile, so everything here is a single column that wraps rather than a
+   grid that would be unreadable at 320px.
+   ------------------------------------------------------------------------- */
+.body-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+
+.body-editor__error {
+  margin: 0 0 var(--s-3);
+  padding: var(--s-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--bad);
+  background: rgb(255 143 163 / 0.12);
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+
+.body-editor__form {
+  margin: 0 0 var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.body-editor__form h3 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+}
+
+.body-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.body-editor__list > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.body-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-2) 0;
+}
+
+.body-editor__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+
+/* Three axis boxes on one row, each keeping a usable width as the panel
+   narrows. They wrap to two lines rather than shrinking below legibility. */
+.vector-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-3);
+  padding: var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.vector-fields legend {
+  padding: 0 var(--s-1);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.vector-fields__unit {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.vector-fields__axis {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex: 1 1 6rem;
+}
+
+.vector-fields__axis label {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.vector-fields__axis input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
 }

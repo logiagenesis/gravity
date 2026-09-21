@@ -8,6 +8,8 @@
  * (artifacts/03-current-site-audit.md §5.1).
  */
 import type { CollisionMode } from "../sim/collisions";
+import type { EditResult, ScenarioEdit } from "../sim/edits";
+import type { BodyInit } from "../sim/state";
 import type { BodyMeta, MainToWorker, SnapshotMessage, WorkerToMain } from "./protocol";
 import type { Scenario } from "../schema/scenario";
 
@@ -23,6 +25,13 @@ export class SimulationClient {
   private worker: Worker;
   private events: SimulationClientEvents;
   private disposed = false;
+  /** Correlates an applyEdit call with the worker's reply. */
+  private editRequestId = 0;
+  private pendingDetails = new Map<number, (body: BodyInit | null) => void>();
+  private pendingEdits = new Map<
+    number,
+    { resolve: (result: EditResult) => void; reject: (error: Error) => void }
+  >();
 
   constructor(events: SimulationClientEvents = {}) {
     this.events = events;
@@ -54,6 +63,24 @@ export class SimulationClient {
         break;
       case "collision":
         this.events.onCollision?.(message.absorbed, message.survivor);
+        break;
+      case "editApplied": {
+        // The body set may have changed, so the renderer is told before the
+        // promise resolves and the caller redraws anything.
+        this.events.onLoaded?.("", message.bodies, message.topologyVersion);
+        this.pendingEdits
+          .get(message.requestId)
+          ?.resolve({ inverse: message.inverse, applied: message.applied });
+        this.pendingEdits.delete(message.requestId);
+        break;
+      }
+      case "bodyDetail":
+        this.pendingDetails.get(message.requestId)?.(message.body);
+        this.pendingDetails.delete(message.requestId);
+        break;
+      case "editRejected":
+        this.pendingEdits.get(message.requestId)?.reject(new Error(message.message));
+        this.pendingEdits.delete(message.requestId);
         break;
       case "error":
         this.events.onError?.(message.message, message.detail);
@@ -93,6 +120,31 @@ export class SimulationClient {
   setForceMode(mode: SnapshotMessage["forceMode"] | "auto"): void {
     this.send({ type: "setForceMode", mode });
   }
+  /**
+   * Apply an edit to the live simulation.
+   *
+   * Resolves with the edit that undoes it and the edit in resolved form, or
+   * rejects with the reason it was refused. The worker validates before
+   * writing anything, so a rejection means the simulation is exactly as it
+   * was.
+   */
+  applyEdit(edit: ScenarioEdit): Promise<EditResult> {
+    const requestId = ++this.editRequestId;
+    return new Promise<EditResult>((resolve, reject) => {
+      this.pendingEdits.set(requestId, { resolve, reject });
+      this.send({ type: "applyEdit", edit, requestId });
+    });
+  }
+
+  /** One body's full state, including its velocity. Null if it is gone. */
+  requestBodyDetail(id: string): Promise<BodyInit | null> {
+    const requestId = ++this.editRequestId;
+    return new Promise<BodyInit | null>((resolve) => {
+      this.pendingDetails.set(requestId, resolve);
+      this.send({ type: "requestBodyDetail", id, requestId });
+    });
+  }
+
   setSoftening(softening: number): void {
     this.send({ type: "setSoftening", softening });
   }

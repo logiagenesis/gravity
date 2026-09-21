@@ -22,22 +22,35 @@ export interface BodyInit {
 }
 
 export class SimState {
-  /** Number of slots allocated (active plus inactive). */
-  readonly capacity: number;
+  /**
+   * Number of slots allocated (active plus inactive).
+   *
+   * Not readonly, because adding a body past the allocation GROWS the arrays
+   * rather than throwing. Editing a scenario is a first-class operation, and
+   * a simulator that refuses to add a body because of how it allocated its
+   * buffers would be exposing an implementation detail as a limit.
+   */
+  capacity: number;
   /** Number of slots in use. Merged bodies are compacted out, so this shrinks. */
   count: number;
 
-  readonly positions: Float64Array;
-  readonly velocities: Float64Array;
-  readonly accelerations: Float64Array;
-  readonly masses: Float64Array;
-  readonly radii: Float64Array;
-  readonly flags: Uint8Array;
+  /*
+   * Re-assigned on growth, so not readonly. Nothing outside this class holds
+   * a long-lived reference to them: snapshots COPY into a pooled transfer
+   * buffer rather than handing these out (src/worker/simulation.worker.ts),
+   * which is what makes growing them safe.
+   */
+  positions: Float64Array;
+  velocities: Float64Array;
+  accelerations: Float64Array;
+  masses: Float64Array;
+  radii: Float64Array;
+  flags: Uint8Array;
 
   /** Parallel metadata. Not transferred to the renderer each frame. */
-  readonly ids: string[];
-  readonly names: string[];
-  readonly colours: string[];
+  ids: string[];
+  names: string[];
+  colours: string[];
 
   constructor(capacity: number) {
     this.capacity = capacity;
@@ -59,12 +72,46 @@ export class SimState {
     return state;
   }
 
+  /**
+   * Reallocate to at least `needed` slots, preserving every value.
+   *
+   * Growth is geometric so that adding bodies one at a time is amortised
+   * linear rather than quadratic.
+   */
+  private grow(needed: number): void {
+    if (needed <= this.capacity) return;
+    const capacity = Math.max(needed, Math.ceil(this.capacity * 1.5) + 8);
+
+    const copyFloat = (source: Float64Array, stride: number) => {
+      const next = new Float64Array(capacity * stride);
+      next.set(source.subarray(0, this.count * stride));
+      return next;
+    };
+
+    this.positions = copyFloat(this.positions, 3);
+    this.velocities = copyFloat(this.velocities, 3);
+    this.accelerations = copyFloat(this.accelerations, 3);
+    this.masses = copyFloat(this.masses, 1);
+    this.radii = copyFloat(this.radii, 1);
+
+    const flags = new Uint8Array(capacity);
+    flags.set(this.flags.subarray(0, this.count));
+    this.flags = flags;
+
+    const pad = (source: string[]) => {
+      const next = new Array<string>(capacity).fill("");
+      for (let i = 0; i < this.count; i++) next[i] = source[i];
+      return next;
+    };
+    this.ids = pad(this.ids);
+    this.names = pad(this.names);
+    this.colours = pad(this.colours);
+
+    this.capacity = capacity;
+  }
+
   addBody(body: BodyInit): number {
-    if (this.count >= this.capacity) {
-      throw new RangeError(
-        `SimState capacity ${this.capacity} exceeded; cannot add "${body.name}".`,
-      );
-    }
+    this.grow(this.count + 1);
     const i = this.count++;
     const k = i * 3;
     this.positions[k] = body.position.x;
@@ -89,6 +136,20 @@ export class SimState {
 
   isMassless(i: number): boolean {
     return (this.flags[i] & FLAG_MASSLESS) !== 0;
+  }
+
+  /**
+   * Mark a body as a test particle, or stop it being one.
+   *
+   * Kept in step with the mass by the edit layer: a body edited to zero mass
+   * becomes massless, and one given mass stops being massless. Without that,
+   * a "massless" body could silently gravitate, or a massive one could
+   * silently stop.
+   */
+  setMassless(i: number, massless: boolean): void {
+    this.flags[i] = massless
+      ? this.flags[i] | FLAG_MASSLESS
+      : this.flags[i] & ~FLAG_MASSLESS;
   }
 
   /**

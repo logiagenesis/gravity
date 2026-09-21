@@ -24,6 +24,19 @@ import { INTEGRATOR_INFO, type IntegratorName } from "../sim/integrators";
 import { COLLISION_MODE_INFO, type CollisionMode } from "../sim/collisions";
 import { simulationWarnings } from "../sim/warnings";
 import { DriftChart, type DriftSample } from "./components/DriftChart";
+import { BodyEditor } from "./components/BodyEditor";
+import {
+  EMPTY_HISTORY,
+  canRedo,
+  canUndo,
+  commitRedo,
+  commitUndo,
+  nextRedo,
+  nextUndo,
+  recordEdit,
+  type EditHistory,
+} from "./edit-history";
+import type { ScenarioEdit } from "../sim/edits";
 import { DAYS_PER_JULIAN_YEAR } from "../sim/constants";
 import type { Scenario } from "../schema/scenario";
 import { Tabs } from "./components/Tabs";
@@ -157,6 +170,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("bodies");
+  const [history, setHistory] = useState<EditHistory>(EMPTY_HISTORY);
   const [frameMs, setFrameMs] = useState(0);
   const [frameKind, setFrameKind] = useState<FrameKind>("inertial");
   const [primaryIndex, setPrimaryIndex] = useState(0);
@@ -352,6 +366,9 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const handleReset = useCallback(() => {
     clientRef.current?.reset();
     setPlaying(false);
+    // Reset restores the published scenario, so the recorded edits no longer
+    // describe anything that happened and undoing them would corrupt it.
+    setHistory(EMPTY_HISTORY);
     setAnnounce("Simulation reset to its starting conditions.");
   }, []);
 
@@ -401,6 +418,69 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     setSaveState("Image saved.");
     setAnnounce("Image saved.");
   };
+
+  /**
+   * Apply an edit and record it for undo.
+   *
+   * The history moves only AFTER the worker confirms. The worker validates
+   * before it writes, so a rejected edit leaves the simulation untouched — and
+   * a history that had already moved would then offer an undo for something
+   * that never happened.
+   */
+  const handleEdit = useCallback(async (edit: ScenarioEdit) => {
+    const client = clientRef.current;
+    if (!client) throw new Error("The simulation is not running.");
+    const result = await client.applyEdit(edit);
+    setHistory((current) => recordEdit(current, result));
+    setAnnounce(
+      edit.kind === "remove"
+        ? "Body removed."
+        : edit.kind === "update"
+          ? "Body updated."
+          : "Body added.",
+    );
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    const client = clientRef.current;
+    const edit = nextUndo(history);
+    if (!client || edit === null) return;
+    void client.applyEdit(edit).then(
+      () => {
+        setHistory(commitUndo);
+        setAnnounce("Edit undone.");
+      },
+      (caught: unknown) => {
+        // An undo that cannot be applied is a bug, not a user error, so it
+        // says so rather than silently leaving the buttons out of step.
+        setError(
+          `Undo failed: ${caught instanceof Error ? caught.message : String(caught)}`,
+        );
+      },
+    );
+  }, [history]);
+
+  const handleRedo = useCallback(() => {
+    const client = clientRef.current;
+    const edit = nextRedo(history);
+    if (!client || edit === null) return;
+    void client.applyEdit(edit).then(
+      () => {
+        setHistory(commitRedo);
+        setAnnounce("Edit redone.");
+      },
+      (caught: unknown) => {
+        setError(
+          `Redo failed: ${caught instanceof Error ? caught.message : String(caught)}`,
+        );
+      },
+    );
+  }, [history]);
+
+  const loadBodyDetail = useCallback(
+    (id: string) => clientRef.current?.requestBodyDetail(id) ?? Promise.resolve(null),
+    [],
+  );
 
   const handleCollisionMode = (mode: CollisionMode) => {
     setCollisionMode(mode);
@@ -1019,6 +1099,26 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     </dl>
   );
 
+  const editorPanel = (
+    <>
+      <p className="source-note">
+        Change the system and watch what happens. Edits apply to the running simulation
+        rather than restarting it, so you can remove a planet mid-orbit and see the rest
+        respond. Reset restores the published scenario.
+      </p>
+      <BodyEditor
+        bodies={bodies}
+        loadDetail={loadBodyDetail}
+        applyEdit={handleEdit}
+        canUndo={canUndo(history)}
+        canRedo={canRedo(history)}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        editCount={hud?.editCount ?? 0}
+      />
+    </>
+  );
+
   const sharePanel = (
     <>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-2)" }}>
@@ -1167,6 +1267,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               { id: "bodies", label: "Bodies", content: bodiesPanel },
               { id: "diagnostics", label: "Diagnostics", content: diagnosticsPanel },
               { id: "settings", label: "View", content: settingsPanel },
+              { id: "edit", label: "Edit", content: editorPanel },
               { id: "source", label: "Source", content: sourcePanel },
               { id: "share", label: "Share", content: sharePanel },
             ]}
