@@ -24,6 +24,28 @@ import { INTEGRATOR_INFO, type IntegratorName } from "../sim/integrators";
 import { COLLISION_MODE_INFO, type CollisionMode } from "../sim/collisions";
 import { simulationWarnings } from "../sim/warnings";
 import { DriftChart, type DriftSample } from "./components/DriftChart";
+import { BodyEditor } from "./components/BodyEditor";
+import { Experiments } from "./components/Experiments";
+import { experimentsFor } from "../experiments/catalogue";
+import {
+  DETAIL_LEVEL_INFO,
+  readDetailLevel,
+  shows,
+  writeDetailLevel,
+  type DetailLevel,
+} from "./detail-level";
+import {
+  EMPTY_HISTORY,
+  canRedo,
+  canUndo,
+  commitRedo,
+  commitUndo,
+  nextRedo,
+  nextUndo,
+  recordEdit,
+  type EditHistory,
+} from "./edit-history";
+import type { ScenarioEdit } from "../sim/edits";
 import { DAYS_PER_JULIAN_YEAR } from "../sim/constants";
 import type { Scenario } from "../schema/scenario";
 import { Tabs } from "./components/Tabs";
@@ -157,6 +179,9 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("bodies");
+  const [history, setHistory] = useState<EditHistory>(EMPTY_HISTORY);
+  /* Read once, lazily: localStorage can throw, and this must not run per render. */
+  const [detailLevel, setDetailLevel] = useState<DetailLevel>(readDetailLevel);
   const [frameMs, setFrameMs] = useState(0);
   const [frameKind, setFrameKind] = useState<FrameKind>("inertial");
   const [primaryIndex, setPrimaryIndex] = useState(0);
@@ -173,17 +198,27 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const initialFocus = useMemo(() => {
     const target = scenario.camera?.target;
     if (target === undefined) return null;
-    const index = scenario.bodies.findIndex((body) => body.id === target);
-    return index >= 0 ? index : null;
+    return scenario.bodies.some((body) => body.id === target) ? target : null;
   }, [scenario]);
 
-  const [focusIndex, setFocusIndex] = useState<number | null>(initialFocus);
+  /*
+   * Focus is held as a body ID, not an index.
+   *
+   * The renderer works in indices, because it reads a positions buffer, and
+   * for a fixed body set an index was the same thing. Editing broke that:
+   * removing a body shifts every later index down, so "follow body 4" quietly
+   * became "follow whatever is in slot 4 now", or nothing at all when the set
+   * shrank past it. An ID survives any edit, and the index is derived from the
+   * live body list on the way to the renderer.
+   */
+  const [focusId, setFocusId] = useState<string | null>(initialFocus);
   const [showLabels, setShowLabels] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
   const [showBarycentre, setShowBarycentre] = useState(false);
   const [scaleMode, setScaleMode] = useState<ScaleMode>("legible");
 
   const speedId = useId();
+  const detailLevelId = useId();
   const integratorId = useId();
   const panelId = useId();
   const frameId = useId();
@@ -310,13 +345,19 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     sceneRef.current?.setScaleMode(scaleMode);
   }, [scaleMode]);
 
+  const focusIndex = useMemo(() => {
+    if (focusId === null) return null;
+    const index = bodies.findIndex((body) => body.id === focusId);
+    return index >= 0 ? index : null;
+  }, [bodies, focusId]);
+
   useEffect(() => {
     sceneRef.current?.setFocus(focusIndex);
   }, [focusIndex]);
 
   // A new scenario brings its own framing and its own contact mode with it.
   useEffect(() => {
-    setFocusIndex(initialFocus);
+    setFocusId(initialFocus);
   }, [initialFocus]);
 
   useEffect(() => {
@@ -352,6 +393,9 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const handleReset = useCallback(() => {
     clientRef.current?.reset();
     setPlaying(false);
+    // Reset restores the published scenario, so the recorded edits no longer
+    // describe anything that happened and undoing them would corrupt it.
+    setHistory(EMPTY_HISTORY);
     setAnnounce("Simulation reset to its starting conditions.");
   }, []);
 
@@ -402,6 +446,82 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     setAnnounce("Image saved.");
   };
 
+  /**
+   * Apply an edit and record it for undo.
+   *
+   * The history moves only AFTER the worker confirms. The worker validates
+   * before it writes, so a rejected edit leaves the simulation untouched — and
+   * a history that had already moved would then offer an undo for something
+   * that never happened.
+   */
+  const handleEdit = useCallback(async (edit: ScenarioEdit) => {
+    const client = clientRef.current;
+    if (!client) throw new Error("The simulation is not running.");
+    const result = await client.applyEdit(edit);
+    setHistory((current) => recordEdit(current, result));
+    setAnnounce(
+      edit.kind === "remove"
+        ? "Body removed."
+        : edit.kind === "update"
+          ? "Body updated."
+          : "Body added.",
+    );
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    const client = clientRef.current;
+    const edit = nextUndo(history);
+    if (!client || edit === null) return;
+    void client.applyEdit(edit).then(
+      () => {
+        setHistory(commitUndo);
+        setAnnounce("Edit undone.");
+      },
+      (caught: unknown) => {
+        // An undo that cannot be applied is a bug, not a user error, so it
+        // says so rather than silently leaving the buttons out of step.
+        setError(
+          `Undo failed: ${caught instanceof Error ? caught.message : String(caught)}`,
+        );
+      },
+    );
+  }, [history]);
+
+  const handleRedo = useCallback(() => {
+    const client = clientRef.current;
+    const edit = nextRedo(history);
+    if (!client || edit === null) return;
+    void client.applyEdit(edit).then(
+      () => {
+        setHistory(commitRedo);
+        setAnnounce("Edit redone.");
+      },
+      (caught: unknown) => {
+        setError(
+          `Redo failed: ${caught instanceof Error ? caught.message : String(caught)}`,
+        );
+      },
+    );
+  }, [history]);
+
+  const loadBodyDetail = useCallback(
+    (id: string) => clientRef.current?.requestBodyDetail(id) ?? Promise.resolve(null),
+    [],
+  );
+
+  /**
+   * Change how much of the simulator is shown, and remember it.
+   *
+   * Announced because the change is elsewhere on the page: rows and controls
+   * appear or disappear in a panel the person may not be looking at.
+   */
+  const handleDetailLevel = (level: DetailLevel) => {
+    setDetailLevel(level);
+    writeDetailLevel(level);
+    const info = DETAIL_LEVEL_INFO.find((entry) => entry.level === level);
+    setAnnounce(`Showing: ${info?.label ?? level}. ${info?.description ?? ""}`);
+  };
+
   const handleCollisionMode = (mode: CollisionMode) => {
     setCollisionMode(mode);
     clientRef.current?.setCollisionMode(mode);
@@ -449,7 +569,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         setShowLabels((v) => !v);
       } else if (event.key === "c") {
         sceneRef.current?.recentreCamera();
-        setFocusIndex(null);
+        setFocusId(null);
         setAnnounce("Camera recentred.");
       } else if (event.key === "+" || event.key === "=") {
         sceneRef.current?.zoomCamera(0.85);
@@ -556,6 +676,24 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   );
   const positions = positionsRef.current;
 
+  const experiments = useMemo(() => experimentsFor(scenario.id), [scenario.id]);
+
+  const showDiagnostics = shows(detailLevel, "diagnostics");
+  const showMethod = shows(detailLevel, "method");
+  const showNumerics = shows(detailLevel, "numerics");
+
+  /*
+   * Show the z column only when something is actually out of the plane.
+   *
+   * The panel is 392px wide at every viewport, and five numeric columns do not
+   * fit: z was clipped at the right edge. Most catalogue scenarios are
+   * coplanar by construction, so that clipped column was a column of zeros —
+   * it cost the information in x and y to show nothing. The real ephemerides
+   * from Horizons are not coplanar, and there it appears.
+   */
+  const hasOutOfPlane =
+    positions !== null && bodies.some((_, index) => positions[index * 3 + 2] !== 0);
+
   const timestepWarning = useMemo(() => {
     if (!hud) return null;
     if (hud.energyDrift > DRIFT_BAD) {
@@ -578,6 +716,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
     <>
       <p className="source-note">
         A live, readable equivalent of the 3D view. Positions are in astronomical units.
+        {hasOutOfPlane ? "" : " Every body is in the z = 0 plane."}
       </p>
       <table className="diagnostics">
         <caption className="visually-hidden">
@@ -589,22 +728,22 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
             <th scope="col">Mass (M☉)</th>
             <th scope="col">x</th>
             <th scope="col">y</th>
-            <th scope="col">z</th>
+            {hasOutOfPlane && <th scope="col">z</th>}
           </tr>
         </thead>
         <tbody>
           {bodies.map((body, index) => (
-            <tr key={body.id} data-focused={focusIndex === index ? "true" : undefined}>
+            <tr key={body.id} data-focused={focusId === body.id ? "true" : undefined}>
               <th scope="row">
                 <button
                   type="button"
                   className="body-focus"
-                  aria-pressed={focusIndex === index}
+                  aria-pressed={focusId === body.id}
                   onClick={() => {
-                    const next = focusIndex === index ? null : index;
-                    setFocusIndex(next);
+                    const following = focusId === body.id;
+                    setFocusId(following ? null : body.id);
                     setAnnounce(
-                      next === null
+                      following
                         ? "Camera no longer following a body."
                         : `Camera following ${body.name}.`,
                     );
@@ -621,9 +760,11 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               <td className="value">
                 {positions ? formatScientific(positions[index * 3 + 1]) : "—"}
               </td>
-              <td className="value">
-                {positions ? formatScientific(positions[index * 3 + 2]) : "—"}
-              </td>
+              {hasOutOfPlane && (
+                <td className="value">
+                  {positions ? formatScientific(positions[index * 3 + 2]) : "—"}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -633,25 +774,27 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
 
   const diagnosticsPanel = (
     <>
-      <div className="drift-charts">
-        <DriftChart
-          samples={driftHistory.energy}
-          label="Energy error"
-          summary={
-            `Relative energy error over time, on a logarithmic scale from 1e-16 to 1. ` +
-            `Currently ${hud ? hud.energyDrift.toExponential(1) : "unknown"}.`
-          }
-        />
-        <DriftChart
-          samples={driftHistory.angular}
-          label="Angular momentum error"
-          summary={
-            `Relative angular momentum error over time, on a logarithmic scale from ` +
-            `1e-16 to 1. Currently ` +
-            `${hud ? hud.angularMomentumDrift.toExponential(1) : "unknown"}.`
-          }
-        />
-      </div>
+      {showDiagnostics && (
+        <div className="drift-charts">
+          <DriftChart
+            samples={driftHistory.energy}
+            label="Energy error"
+            summary={
+              `Relative energy error over time, on a logarithmic scale from 1e-16 to 1. ` +
+              `Currently ${hud ? hud.energyDrift.toExponential(1) : "unknown"}.`
+            }
+          />
+          <DriftChart
+            samples={driftHistory.angular}
+            label="Angular momentum error"
+            summary={
+              `Relative angular momentum error over time, on a logarithmic scale from ` +
+              `1e-16 to 1. Currently ` +
+              `${hud ? hud.angularMomentumDrift.toExponential(1) : "unknown"}.`
+            }
+          />
+        </div>
+      )}
       {warnings.length > 0 && (
         <ul className="warnings" aria-label="Warnings about this simulation">
           {warnings.map((warning) => (
@@ -662,10 +805,12 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
           ))}
         </ul>
       )}
-      <p className="source-note">
-        In an exact integration these would never change, so the drift is a direct
-        measure of how much to trust what you are watching.
-      </p>
+      {showDiagnostics && (
+        <p className="source-note">
+          In an exact integration these would never change, so the drift is a direct
+          measure of how much to trust what you are watching.
+        </p>
+      )}
       {hud !== null && hud.baselineResets > 0 && (
         <p className="source-note">
           The baseline has been reset {hud.baselineResets}{" "}
@@ -690,22 +835,28 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
             <th scope="row">Timestep</th>
             <td className="value">{hud ? `${hud.dt} d` : "—"}</td>
           </tr>
-          <tr>
-            <th scope="row">Total energy</th>
-            <td className="value">{hud ? formatScientific(hud.energy) : "—"}</td>
-          </tr>
-          <tr>
-            <th scope="row">Energy drift</th>
-            <td className={`value ${hud ? driftClass(hud.energyDrift) : ""}`}>
-              {hud ? hud.energyDrift.toExponential(2) : "—"}
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">Angular momentum drift</th>
-            <td className={`value ${hud ? driftClass(hud.angularMomentumDrift) : ""}`}>
-              {hud ? hud.angularMomentumDrift.toExponential(2) : "—"}
-            </td>
-          </tr>
+          {showDiagnostics && (
+            <>
+              <tr>
+                <th scope="row">Total energy</th>
+                <td className="value">{hud ? formatScientific(hud.energy) : "—"}</td>
+              </tr>
+              <tr>
+                <th scope="row">Energy drift</th>
+                <td className={`value ${hud ? driftClass(hud.energyDrift) : ""}`}>
+                  {hud ? hud.energyDrift.toExponential(2) : "—"}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Angular momentum drift</th>
+                <td
+                  className={`value ${hud ? driftClass(hud.angularMomentumDrift) : ""}`}
+                >
+                  {hud ? hud.angularMomentumDrift.toExponential(2) : "—"}
+                </td>
+              </tr>
+            </>
+          )}
           {hud !== null && hud.baselineResets > 0 && (
             <tr>
               <th scope="row">Baseline resets</th>
@@ -714,7 +865,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
           )}
           {/* Shown only once it is doing something, so it reads as "an
               encounter is happening" rather than as permanent clutter. */}
-          {hud !== null && hud.peakSubsteps > 1 && (
+          {showNumerics && hud !== null && hud.peakSubsteps > 1 && (
             <tr>
               <th scope="row">Substeps (now / peak)</th>
               <td className="value">
@@ -722,18 +873,26 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               </td>
             </tr>
           )}
-          <tr>
-            <th scope="row">Force method</th>
-            <td className="value">{hud?.forceMode ?? "—"}</td>
-          </tr>
-          <tr>
-            <th scope="row">Worker step time</th>
-            <td className="value">{hud ? `${hud.workerStepMs.toFixed(1)} ms` : "—"}</td>
-          </tr>
-          <tr>
-            <th scope="row">Render frame time</th>
-            <td className="value">{frameMs > 0 ? `${frameMs.toFixed(1)} ms` : "—"}</td>
-          </tr>
+          {showNumerics && (
+            <>
+              <tr>
+                <th scope="row">Force method</th>
+                <td className="value">{hud?.forceMode ?? "—"}</td>
+              </tr>
+              <tr>
+                <th scope="row">Worker step time</th>
+                <td className="value">
+                  {hud ? `${hud.workerStepMs.toFixed(1)} ms` : "—"}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Render frame time</th>
+                <td className="value">
+                  {frameMs > 0 ? `${frameMs.toFixed(1)} ms` : "—"}
+                </td>
+              </tr>
+            </>
+          )}
         </tbody>
       </table>
     </>
@@ -748,127 +907,161 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
   const settingsPanel = (
     <>
       <div className="field">
-        <label htmlFor={integratorId}>Integrator</label>
+        <label htmlFor={detailLevelId}>How much to show</label>
         <div className="select">
           <select
-            id={integratorId}
-            value={integrator}
-            onChange={(event) => handleIntegrator(event.target.value as IntegratorName)}
-            aria-describedby="integrator-guidance"
+            id={detailLevelId}
+            value={detailLevel}
+            onChange={(event) => handleDetailLevel(event.target.value as DetailLevel)}
+            aria-describedby="detail-level-hint"
           >
-            {INTEGRATOR_INFO.map((info) => (
-              <option key={info.name} value={info.name}>
-                {info.label} — order {info.order}
-                {info.symplectic ? ", symplectic" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        <p className="field-hint" id="integrator-guidance">
-          {integratorInfo?.guidance}
-        </p>
-      </div>
-
-      <div className="field">
-        <label htmlFor={collisionId}>On contact</label>
-        <div className="select">
-          <select
-            id={collisionId}
-            value={collisionMode}
-            onChange={(event) =>
-              handleCollisionMode(event.target.value as CollisionMode)
-            }
-            aria-describedby="collision-guidance"
-          >
-            {COLLISION_MODE_INFO.map((info) => (
-              <option key={info.mode} value={info.mode}>
+            {DETAIL_LEVEL_INFO.map((info) => (
+              <option key={info.level} value={info.level}>
                 {info.label}
               </option>
             ))}
           </select>
         </div>
-        {/* Each mode obeys a different conservation law, and the reader is
-            told which BEFORE they wonder why the energy readout jumped. */}
-        <p className="field-hint" id="collision-guidance">
-          {collisionInfo?.conserves}
+        <p className="field-hint" id="detail-level-hint">
+          {DETAIL_LEVEL_INFO.find((info) => info.level === detailLevel)?.description}
+          {" Warnings and citations are shown at every level."}
         </p>
       </div>
 
-      <div className="field">
-        <label htmlFor={timestepId}>Timestep (days)</label>
-        <input
-          id={timestepId}
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="any"
-          value={timestepText}
-          onChange={(event) => handleTimestep(event.target.value)}
-          aria-describedby="timestep-hint"
-        />
-        <p className="field-hint" id="timestep-hint">
-          {hud !== null && hud.shortestPeriodDays !== null && hud.dt > 0
-            ? `${(hud.shortestPeriodDays / hud.dt).toFixed(0)} steps per orbit of the ` +
-              `fastest body. Below about 20, the shape of the orbit is not resolved.`
-            : "Smaller is more accurate and slower."}
-        </p>
-      </div>
-
-      <div className="field">
-        <label htmlFor={softeningId}>Softening (AU)</label>
-        <input
-          id={softeningId}
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="any"
-          value={softeningText}
-          onChange={(event) => handleSoftening(event.target.value)}
-          aria-describedby="softening-hint"
-        />
-        <p className="field-hint" id="softening-hint">
-          Replaces the force at short range with a weaker, finite one, so two bodies
-          passing very close cannot produce an infinite acceleration. Zero is exact
-          Newtonian gravity.
-        </p>
-      </div>
-
-      <div className="field">
-        <label htmlFor={frameId}>Reference frame</label>
-        <div className="select">
-          <select
-            id={frameId}
-            value={frameKind}
-            onChange={(event) => {
-              const kind = event.target.value as FrameKind;
-              setFrameKind(kind);
-              setAnnounce(
-                `Reference frame: ${describeFrame(
-                  { kind, primaryIndex, secondaryIndex },
-                  bodies.map((b) => b.name),
-                )}.`,
-              );
-            }}
-            aria-describedby="frame-hint"
-          >
-            <option value="inertial">Inertial</option>
-            <option value="barycentric">Barycentric</option>
-            <option value="body">Centred on a body</option>
-            <option value="rotating">Rotating with a pair</option>
-          </select>
+      {showMethod && (
+        <div className="field">
+          <label htmlFor={integratorId}>Integrator</label>
+          <div className="select">
+            <select
+              id={integratorId}
+              value={integrator}
+              onChange={(event) =>
+                handleIntegrator(event.target.value as IntegratorName)
+              }
+              aria-describedby="integrator-guidance"
+            >
+              {INTEGRATOR_INFO.map((info) => (
+                <option key={info.name} value={info.name}>
+                  {info.label} — order {info.order}
+                  {info.symplectic ? ", symplectic" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="field-hint" id="integrator-guidance">
+            {integratorInfo?.guidance}
+          </p>
         </div>
-        <p className="field-hint" id="frame-hint">
-          {frameKind === "rotating"
-            ? "The line joining the pair is held fixed. This is what makes Lagrange points and Trojan clouds stand still instead of blurring."
-            : frameKind === "barycentric"
-              ? "Origin at the system centre of mass."
-              : frameKind === "body"
-                ? "Origin at the chosen body."
-                : "Raw simulation coordinates."}
-        </p>
-      </div>
+      )}
 
-      {(frameKind === "body" || frameKind === "rotating") && (
+      {showMethod && (
+        <div className="field">
+          <label htmlFor={collisionId}>On contact</label>
+          <div className="select">
+            <select
+              id={collisionId}
+              value={collisionMode}
+              onChange={(event) =>
+                handleCollisionMode(event.target.value as CollisionMode)
+              }
+              aria-describedby="collision-guidance"
+            >
+              {COLLISION_MODE_INFO.map((info) => (
+                <option key={info.mode} value={info.mode}>
+                  {info.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {/* Each mode obeys a different conservation law, and the reader is
+            told which BEFORE they wonder why the energy readout jumped. */}
+          <p className="field-hint" id="collision-guidance">
+            {collisionInfo?.conserves}
+          </p>
+        </div>
+      )}
+
+      {showMethod && (
+        <div className="field">
+          <label htmlFor={timestepId}>Timestep (days)</label>
+          <input
+            id={timestepId}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={timestepText}
+            onChange={(event) => handleTimestep(event.target.value)}
+            aria-describedby="timestep-hint"
+          />
+          <p className="field-hint" id="timestep-hint">
+            {hud !== null && hud.shortestPeriodDays !== null && hud.dt > 0
+              ? `${(hud.shortestPeriodDays / hud.dt).toFixed(0)} steps per orbit of the ` +
+                `fastest body. Below about 20, the shape of the orbit is not resolved.`
+              : "Smaller is more accurate and slower."}
+          </p>
+        </div>
+      )}
+
+      {showNumerics && (
+        <div className="field">
+          <label htmlFor={softeningId}>Softening (AU)</label>
+          <input
+            id={softeningId}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={softeningText}
+            onChange={(event) => handleSoftening(event.target.value)}
+            aria-describedby="softening-hint"
+          />
+          <p className="field-hint" id="softening-hint">
+            Replaces the force at short range with a weaker, finite one, so two bodies
+            passing very close cannot produce an infinite acceleration. Zero is exact
+            Newtonian gravity.
+          </p>
+        </div>
+      )}
+
+      {showMethod && (
+        <div className="field">
+          <label htmlFor={frameId}>Reference frame</label>
+          <div className="select">
+            <select
+              id={frameId}
+              value={frameKind}
+              onChange={(event) => {
+                const kind = event.target.value as FrameKind;
+                setFrameKind(kind);
+                setAnnounce(
+                  `Reference frame: ${describeFrame(
+                    { kind, primaryIndex, secondaryIndex },
+                    bodies.map((b) => b.name),
+                  )}.`,
+                );
+              }}
+              aria-describedby="frame-hint"
+            >
+              <option value="inertial">Inertial</option>
+              <option value="barycentric">Barycentric</option>
+              <option value="body">Centred on a body</option>
+              <option value="rotating">Rotating with a pair</option>
+            </select>
+          </div>
+          <p className="field-hint" id="frame-hint">
+            {frameKind === "rotating"
+              ? "The line joining the pair is held fixed. This is what makes Lagrange points and Trojan clouds stand still instead of blurring."
+              : frameKind === "barycentric"
+                ? "Origin at the system centre of mass."
+                : frameKind === "body"
+                  ? "Origin at the chosen body."
+                  : "Raw simulation coordinates."}
+          </p>
+        </div>
+      )}
+
+      {showMethod && (frameKind === "body" || frameKind === "rotating") && (
         <div className="field">
           <label htmlFor={`${frameId}-primary`}>
             {frameKind === "rotating" ? "Primary" : "Centre on"}
@@ -885,7 +1078,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         </div>
       )}
 
-      {frameKind === "rotating" && (
+      {showMethod && frameKind === "rotating" && (
         <div className="field">
           <label htmlFor={`${frameId}-secondary`}>Secondary</label>
           <div className="select">
@@ -976,7 +1169,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
             className="btn"
             onClick={() => {
               sceneRef.current?.recentreCamera();
-              setFocusIndex(null);
+              setFocusId(null);
               setAnnounce("Camera recentred.");
             }}
           >
@@ -1017,6 +1210,39 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
         </>
       )}
     </dl>
+  );
+
+  const editorPanel = (
+    <>
+      {/*
+       * Guided experiments lead, the manual editor follows. A learner who
+       * opens this tab should find something to try, not an empty form; the
+       * editor's own framing travels with the editor rather than standing at
+       * the top as a second introduction to the same thing.
+       */}
+      <Experiments
+        experiments={experiments}
+        applyEdit={handleEdit}
+        onPlay={togglePlay}
+        playing={playing}
+      />
+      {experiments.length > 0 && <h3>Or change it yourself</h3>}
+      <p className="source-note">
+        Edits apply to the running simulation rather than restarting it, so you can
+        remove a planet mid-orbit and see the rest respond. Reset restores the published
+        scenario.
+      </p>
+      <BodyEditor
+        bodies={bodies}
+        loadDetail={loadBodyDetail}
+        applyEdit={handleEdit}
+        canUndo={canUndo(history)}
+        canRedo={canRedo(history)}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        editCount={hud?.editCount ?? 0}
+      />
+    </>
   );
 
   const sharePanel = (
@@ -1061,7 +1287,9 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
       <div className="sim__labels" ref={labelsRef} />
 
       <div className="sim__head">
-        <button type="button" className="btn btn--ghost" onClick={onBack}>
+        {/* Hidden in the embedded view by CSS, where the attribution link is
+            the single way out and two competing ones would crowd the corner. */}
+        <button type="button" className="btn btn--ghost sim__back" onClick={onBack}>
           ← Scenarios
         </button>
         <div className="sim__title">
@@ -1167,6 +1395,7 @@ export function SimulatorPage({ scenario, onBack }: SimulatorPageProps) {
               { id: "bodies", label: "Bodies", content: bodiesPanel },
               { id: "diagnostics", label: "Diagnostics", content: diagnosticsPanel },
               { id: "settings", label: "View", content: settingsPanel },
+              { id: "edit", label: "Experiment", content: editorPanel },
               { id: "source", label: "Source", content: sourcePanel },
               { id: "share", label: "Share", content: sharePanel },
             ]}

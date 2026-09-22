@@ -16,6 +16,8 @@
 import type { Scenario } from "../schema/scenario";
 import type { IntegratorName } from "../sim/integrators";
 import type { CollisionMode } from "../sim/collisions";
+import type { ScenarioEdit } from "../sim/edits";
+import type { BodyInit } from "../sim/state";
 import type { ForceMode } from "../sim/forces";
 
 export type MainToWorker =
@@ -30,6 +32,17 @@ export type MainToWorker =
   | { type: "setForceMode"; mode: ForceMode | "auto" }
   | { type: "setSoftening"; softening: number }
   | { type: "setCollisionMode"; mode: CollisionMode }
+  /** Apply an edit to the live simulation. The worker replies with its inverse. */
+  | { type: "applyEdit"; edit: ScenarioEdit; requestId: number }
+  /**
+   * Ask for one body's full state.
+   *
+   * Velocities are deliberately NOT in the per-frame snapshot: carrying them
+   * would double the transfer every frame for a value only the editor reads,
+   * and at 5,000 bodies that is 30 kB a frame of pure waste. Editing is rare,
+   * so it asks.
+   */
+  | { type: "requestBodyDetail"; id: string; requestId: number }
   | { type: "requestSnapshot" }
   /** Hand a used buffer back so the worker can reuse it. */
   | { type: "recycle"; buffer: ArrayBuffer }
@@ -63,6 +76,8 @@ export interface SnapshotMessage {
   angularMomentumDrift: number;
   /** Times the drift baseline was reset by a merge. */
   baselineResets: number;
+  /** Edits applied to this run, so an edited run can say that it is one. */
+  editCount: number;
   /**
    * Substeps used by the most recent outer step, and the most any step has
    * needed since the last reset. 1 means the fixed step was already fine.
@@ -94,4 +109,23 @@ export type WorkerToMain =
       topologyVersion: number;
     }
   | { type: "collision"; absorbed: string[]; survivor: string; mass: number }
+  /**
+   * The result of an `applyEdit`. `inverse` is the edit that undoes it, and
+   * `applied` is the request in resolved form — an `addOrbiting` comes back
+   * as a plain `add` with the position and velocity the worker computed, so
+   * redo reproduces that orbit instead of sizing a new one against a parent
+   * that has since moved. `editRejected` explains why nothing was changed;
+   * an edit is validated before any write, so a rejected one leaves the
+   * simulation untouched.
+   */
+  | {
+      type: "editApplied";
+      requestId: number;
+      bodies: BodyMeta[];
+      topologyVersion: number;
+      inverse: ScenarioEdit;
+      applied: ScenarioEdit;
+    }
+  | { type: "editRejected"; requestId: number; message: string }
+  | { type: "bodyDetail"; requestId: number; body: BodyInit | null }
   | { type: "error"; message: string; detail?: string };

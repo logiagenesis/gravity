@@ -17,6 +17,74 @@ against the requirement · **Absent** = not implemented.
 
 ---
 
+## Status at the end of M5 — every deferred row, resolved or not
+
+**Updated 21/09/2026**, branch head `0ed56c7`. The matrices below are the
+ORIGINAL audit, taken at `902aece` + M0, and they are left as written: a
+point-in-time measurement that is rewritten later is not a measurement. This
+section says what has happened to every row they marked Partial or Absent.
+
+Each verdict below cites a path that exists in this commit or a test that runs
+in `npm run verify`. Where something is still missing it says so and names the
+milestone, rather than being quietly dropped.
+
+### Now Present
+
+| Row            | Requirement                                                      | Evidence                                                                                                                                                             |
+| -------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1 3.3         | Adaptive high-accuracy method **if justified**                   | `src/sim/adaptive.ts`; the justification is measured in `artifacts/12`, not assumed                                                                                  |
+| A1 3.9         | Configurable elastic / inelastic / merge                         | `src/sim/collisions.ts` `COLLISION_MODES`, schema v2 + migration, `tests/physics/collisions.test.ts`                                                                 |
+| A1 3.10        | Visible energy + angular-momentum drift                          | `src/ui/components/DriftChart.tsx`, charted over time, not only instantaneous                                                                                        |
+| A1 4.2         | Adaptive quality                                                 | `src/render/scene.ts:adaptQuality` — frame time scales starfield density, trail length and DPR                                                                       |
+| A1 4.4         | No unnecessary global high-cost settings                         | `scene.ts:609` sets `near`/`far` from the view distance, keeping the ratio inside float depth precision, so `logarithmicDepthBuffer` is **deliberately not** enabled |
+| A1 5.4         | Data pipeline separate from the app                              | `scripts/pipeline/build-exoplanets.ts`, `build-horizons.ts`, `build-binaries.ts`                                                                                     |
+| A1 7.1         | One canonical site                                               | Pages live and auto-deploying; evidence in `artifacts/13`                                                                                                            |
+| A1 7.3         | Filters: type, count, period, difficulty, cost, source, category | `src/ui/catalogue-facets.ts` + `CataloguePage.tsx`: eight groups — category, difficulty, bodies, stars, orbital period, cost, data source, tags — with live counts   |
+| A1 7.4         | Beginner / educational / advanced modes                          | `src/ui/detail-level.ts`; `tests/e2e/detail-level.spec.ts` drives all three                                                                                          |
+| A1 7.5         | Guided experiments                                               | `src/experiments/catalogue.ts`, six of them, each applied to its real scenario in a test                                                                             |
+| A1 7.7         | Warnings for a dangerous timestep or tolerance                   | `src/sim/warnings.ts`, seven warnings including timestep-vs-period                                                                                                   |
+| A1 7.8         | Screenshot / export                                              | `scene.capturePng`, captioned with the scenario's citation                                                                                                           |
+| B 7            | Collision system                                                 | as A1 3.9                                                                                                                                                            |
+| B 9            | Renderer: labels                                                 | `src/render/labels.ts`; adaptive quality as A1 4.2                                                                                                                   |
+| B 10           | Catalogue / search / filters / detail / citations                | 5,142 scenarios across six categories, `src/catalog/`                                                                                                                |
+| B 11           | Simulator UI: modes, picker, HUD, charts, warnings               | all five now present                                                                                                                                                 |
+| C (comparison) | Undo / redo                                                      | `src/ui/edit-history.ts` + `src/sim/edits.ts`, inverse-based, tested exact                                                                                           |
+| C (comparison) | Guided experiments                                               | as A1 7.5                                                                                                                                                            |
+| C (comparison) | Energy / momentum charts                                         | as A1 3.10                                                                                                                                                           |
+| Backlog 5      | Body editor + builder + undo/redo                                | `src/ui/components/BodyEditor.tsx`, `src/ui/BuildPage.tsx`                                                                                                           |
+| Backlog 6      | Modes + guided experiments                                       | as A1 7.4 and 7.5                                                                                                                                                    |
+| Backlog 7      | Diagnostics charts + warnings                                    | as A1 3.10 and 7.7                                                                                                                                                   |
+| Parity 241     | In-UI tuning of dt, softening, θ, force method                   | View tab, gated to the advanced level                                                                                                                                |
+| Parity 242     | A higher-order symplectic and an adaptive method                 | PEFRL (4th order) + adaptive sub-stepping                                                                                                                            |
+| M1 pending     | Spaceflight category                                             | shipped in M4: eight JPL Horizons scenarios, terms recorded in `artifacts/04` §11                                                                                    |
+
+### Still open, with the milestone that owns them
+
+| Row        | Requirement                                | State       | Owner                                                                                |
+| ---------- | ------------------------------------------ | ----------- | ------------------------------------------------------------------------------------ |
+| A1 9.2     | Correct sitemap and robots                 | **Partial** | Correct, but only `/` is indexable while routing is by hash → **M6**                 |
+| A1 9.3     | Structured data                            | **Partial** | `SoftwareApplication` on the home page only; no per-scenario or breadcrumbs → **M6** |
+| B 14       | SEO / privacy / security pass              | **Partial** | Hash routing defeats SEO → **M6**                                                    |
+| B 15       | Final verification                         | **Partial** | Chromium only; no measurement on the deployed URL → **M7**                           |
+| Parity 239 | Habitable-zone overlay                     | **Absent**  | Theirs has it; cheap and directly serves the exoplanet catalogue → **M7**            |
+| —          | Three browsers                             | **Absent**  | `playwright.config.ts` has two projects, both Chromium → **M7**                      |
+| —          | Per-scenario preview images                | **Absent**  | The highest-value visual work outstanding; recorded in `artifacts/10` → **M7**       |
+| —          | `>500 kB` chunk warning on `SimulatorPage` | **Open**    | Reported by every build → **M7**                                                     |
+
+### Added since the original audit, and not in its matrices
+
+| Item                         | Evidence                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Editing a live simulation    | `src/sim/edits.ts`, applied in place with exact inverses                                                    |
+| Order-preserving removal     | `SimState.removeBodyPreservingOrder` + `insertBody`, so undo restores the arrangement, not only the physics |
+| Camera focus by body id      | Survives any edit; an array index did not                                                                   |
+| Chrome-less embedding        | `src/ui/embed.ts`, `?embed=1`                                                                               |
+| The framing decision         | `docs/security-headers.md`, "The framing decision, resolved"                                                |
+| A repeatable screenshot gate | `scripts/capture-screenshots.ts`, fails the run if a page errored                                           |
+| Deployment verification      | `artifacts/13`, separating what was seen on the live host from what was not                                 |
+
+---
+
 ## Matrix A — the original brief, requirement by requirement
 
 ### A1. Default target architecture (brief §1–9)

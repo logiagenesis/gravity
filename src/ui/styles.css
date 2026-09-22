@@ -853,6 +853,16 @@ textarea {
     max-width: none;
     justify-content: center;
     bottom: calc(var(--s-2) + env(safe-area-inset-bottom, 0px));
+    /*
+     * Wrap rather than scroll. At 393px the row is about 40px too wide, and
+     * the speed select was the thing that gave way — it read "1)" with the
+     * rest of the label cut off. The clock moves to a second line instead.
+     */
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .sim__transport .select {
+    flex: 0 0 auto;
   }
   /* Sit exactly on top of the sheet when it is open. */
   .sim[data-panel="open"] .sim__transport {
@@ -918,25 +928,21 @@ textarea {
   margin-bottom: var(--s-3);
 }
 
+/*
+ * Tabs WRAP rather than scroll.
+ *
+ * They used to scroll horizontally behind a fading right edge, which was fine
+ * at five tabs and stopped being fine at six: in the details panel, which is
+ * about 390px wide at every viewport, "Share" was clipped to a single letter
+ * and a first-time visitor had no reason to think anything was there. A second
+ * row costs one line of height and hides nothing.
+ */
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   border-bottom: 1px solid var(--border);
   margin-bottom: var(--s-3);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.tabs::-webkit-scrollbar {
-  display: none;
-}
-/* Fade the right edge so a clipped tab reads as "scroll me", not "broken". */
-.tabs {
-  -webkit-mask-image: linear-gradient(
-    to right,
-    #000 calc(100% - 24px),
-    transparent 100%
-  );
-  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
 }
 .tab {
   min-height: var(--tap);
@@ -1277,4 +1283,324 @@ kbd {
 }
 .diagnostics tr[data-focused="true"] {
   background: rgb(124 196 255 / 0.08);
+}
+
+/* -------------------------------------------------------------------------
+   Body editor
+
+   Lives inside the details panel, which is narrow on desktop and full-width
+   on mobile, so everything here is a single column that wraps rather than a
+   grid that would be unreadable at 320px.
+   ------------------------------------------------------------------------- */
+.body-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+
+.body-editor__error {
+  margin: 0 0 var(--s-3);
+  padding: var(--s-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--bad);
+  background: rgb(255 143 163 / 0.12);
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+
+.body-editor__form {
+  margin: 0 0 var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.body-editor__form h3 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+}
+
+.body-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.body-editor__list > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.body-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-2) 0;
+}
+
+.body-editor__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+
+/* Three axis boxes on one row, each keeping a usable width as the panel
+   narrows. They wrap to two lines rather than shrinking below legibility. */
+.vector-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-3);
+  padding: var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.vector-fields legend {
+  padding: 0 var(--s-1);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.vector-fields__unit {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.vector-fields__axis {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex: 1 1 6rem;
+}
+
+.vector-fields__axis label {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.vector-fields__axis input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------------------
+   Guided experiments
+
+   Cards inside the details panel. The question is the heaviest text on each
+   one because it is what the learner is meant to engage with; the answer is
+   behind a disclosure so it cannot be read by accident.
+   ------------------------------------------------------------------------- */
+.experiments h3,
+.body-editor + h3,
+.experiments + h3 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+.experiments__list {
+  list-style: none;
+  margin: var(--s-3) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.experiment {
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.experiment h4 {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--accent-strong);
+}
+
+.experiment__question {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+.experiments__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+.experiment__answer {
+  margin-top: var(--s-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--s-2);
+}
+
+.experiment__answer summary {
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+}
+
+.experiment__answer summary:hover {
+  color: var(--text);
+}
+
+/*
+ * A disclosure triangle, drawn by hand.
+ *
+ * `display: flex` on the summary suppresses the browser's own marker, and
+ * without one the line read as ordinary prose — in the milestone screenshot
+ * "What happens, and why" looked like a caption rather than something to
+ * press. The global prefers-reduced-motion rule already neutralises the
+ * rotation for anyone who asks for that.
+ */
+.experiment__answer summary::-webkit-details-marker {
+  display: none;
+}
+.experiment__answer summary::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  margin-right: var(--s-2);
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+.experiment__answer[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.experiment__answer p {
+  margin: var(--s-2) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+/* -------------------------------------------------------------------------
+   Build your own
+   ------------------------------------------------------------------------- */
+.build-templates {
+  list-style: none;
+  margin: var(--s-5) 0;
+  padding: 0;
+  display: grid;
+  /* One column on a phone, as many as fit above that. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--s-4);
+}
+
+.build-template {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.build-template h2 {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+
+.build-template p {
+  margin: 0;
+  flex: 1 1 auto;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.build-template .btn {
+  align-self: flex-start;
+}
+
+/* -------------------------------------------------------------------------
+   Embedded view (?embed=1)
+
+   The host page supplies its own navigation, so this one gets out of the way.
+   What stays is the simulation, its controls, its warnings, its citation, and
+   one line saying what this is.
+   ------------------------------------------------------------------------- */
+.embed-attribution {
+  position: absolute;
+  top: var(--s-2);
+  left: var(--s-2);
+  z-index: 9;
+  margin: 0;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radius-sm);
+  background: var(--overlay);
+  font-size: var(--fs-xs);
+}
+
+.embed-attribution a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.embed-attribution a:hover,
+.embed-attribution a:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* The simulator already fills the viewport; an embedded non-simulator page
+   still needs its own padding, since the site header is not there to give it
+   any. */
+.app[data-embed="true"] .main {
+  padding-top: var(--s-6);
+}
+.app[data-embed="true"][data-immersive="true"] .main {
+  padding-top: 0;
+}
+
+/*
+ * The canvas normally leaves room for the site header it sits under. With no
+ * header, that reservation became a black band along the bottom of the frame.
+ */
+.app[data-embed="true"] .sim {
+  height: 100dvh;
+}
+
+/*
+ * One way out, not two. The attribution link occupies the top-left corner in
+ * an embed, and the simulator's own "← Scenarios" would sit on top of it. The
+ * catalogue is still reachable at ?embed=1#/ for a host page that wants it.
+ */
+.app[data-embed="true"] .sim__back {
+  display: none;
+}
+
+/*
+ * ...and with the back button gone, the scenario title slid left UNDER the
+ * attribution. Both are absolutely positioned over the canvas, so neither
+ * pushes the other: the head gets an explicit offset for the line above it.
+ */
+.app[data-embed="true"] .sim__head {
+  top: calc(var(--s-3) + 26px);
 }

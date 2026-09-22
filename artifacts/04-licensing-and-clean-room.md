@@ -344,6 +344,18 @@ that service does, and an ephemeris is only meaningful with its epoch pinned.
 | **Clean-room**     | Unaffected. Looking at a competitor's page to assess it is not copying it. No code, asset, scenario file, shader or text from that site enters this codebase |
 | **Verdict**        | ✅ Held as evidence in a private repository for the owner's own comparison, which is what the owner asked for                                                |
 
+### Prior-art observation held for comparison — M5
+
+| Field              | Value                                                                                                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **File**           | **None.** The observation is written down in `artifacts/14`; no image was committed                                                                                                                                                              |
+| **Source URLs**    | https://gravitysimulator.org/solar-system/the-solar-system and https://gravitysimulator.org/misc/the-figure-eight-n-body-choreography                                                                                                            |
+| **Captured**       | 21–22/09/2026, at 1440×900, through the Cloudflare browser-rendering MCP tool                                                                                                                                                                    |
+| **Why it is here** | Rule 5 requires the equivalent view on the original for M5. The route that renders their simulator returns an image into the session and not to disk, and the route that writes files times out on those pages — both recorded in `artifacts/14` |
+| **How it is used** | Described in prose for comparison only, inside `artifacts/`. Nothing is served by the product and no part of their page is reproduced                                                                                                            |
+| **Clean-room**     | Unaffected. Looking at a competitor's page to assess it is not copying it                                                                                                                                                                        |
+| **Verdict**        | ✅ Observation recorded; the image itself is outstanding and `artifacts/14` says so                                                                                                                                                              |
+
 ### Sources considered and NOT used
 
 | Source                                        | Why not                                                                                                                         |
